@@ -1,0 +1,149 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Invoice;
+use Illuminate\Http\Request;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Response;
+use Carbon\Carbon;
+
+class InvoiceController extends Controller
+{
+    public function showForm()
+    {
+        return view('invoice.form');
+    }
+
+    /**
+     * Build invoice data (single source of truth)
+     */
+    private function buildInvoiceData(Request $request): array
+    {
+        $request->validate([
+            'customer_name'  => 'required|string|max:255',
+            'customer_email' => 'required|email|max:255',
+            'street_address' => 'required|string|max:255',
+            'city_state_zip' => 'required|string|max:255',
+            'invoice_date'   => 'required|date',
+            'due_date'       => 'required|date|after_or_equal:invoice_date',
+            'notes'          => 'nullable|string',
+            'items'          => 'required|array|min:1',
+            'items.*.desc'   => 'required|string',
+            'items.*.qty'    => 'required|integer|min:1',
+            'items.*.price'  => 'required|numeric',
+        ]);
+
+        $items = [];
+        $subTotal = 0;
+
+        foreach ($request->items as $it) {
+            $qty = (int) $it['qty'];
+            $price = (float) $it['price'];
+            $line = $qty * $price;
+
+            $items[] = [
+                'desc'       => $it['desc'],
+                'qty'        => $qty,
+                'price'      => $price,
+                'line_total' => $line,
+            ];
+
+            $subTotal += $line;
+        }
+
+        return [
+            'invoice_no'     => 'INV-' . now()->format('Ymd-His'),
+            'customer_name'  => $request->customer_name,
+            'customer_email' => $request->customer_email,
+            'street_address' => $request->street_address,
+            'city_state_zip' => $request->city_state_zip,
+            'invoice_date'   => $request->invoice_date,
+            'due_date'       => $request->due_date,
+            'items'          => $items,
+            'sub_total'      => $subTotal,
+            'grand_total'    => $subTotal,
+            'notes'          => $request->notes,
+        ];
+    }
+
+    public function preview(Request $request)
+    {
+        $data = $this->buildInvoiceData($request);
+
+        $pdfData = $data;
+        $pdfData['invoice_date'] = Carbon::parse($data['invoice_date'])->format('m/d/Y');
+        $pdfData['due_date'] = Carbon::parse($data['due_date'])->format('m/d/Y');
+
+        $pdf = Pdf::loadView('pdf.invoice', $pdfData)->setPaper('letter');
+
+        $data['pdf_base64'] = base64_encode($pdf->output());
+
+        return view('invoice.preview', $data);
+    }
+
+    public function send(Request $request)
+    {
+        $data = $this->buildInvoiceData($request);
+
+        $invoice = Invoice::create([
+            'invoice_no'      => $data['invoice_no'],
+            'customer_name'   => $data['customer_name'],
+            'customer_email'  => $data['customer_email'],
+            'street_address'  => $data['street_address'],
+            'city_state_zip'  => $data['city_state_zip'],
+            'invoice_date'    => Carbon::parse($data['invoice_date']),
+            'due_date'        => Carbon::parse($data['due_date']),
+            'total'           => $data['grand_total'],
+            'notes'           => $data['notes'],
+            'items' => $data['items'],
+            'sent_at'         => now(),
+        ]);
+
+        $pdfData = $data;
+        $pdfData['invoice_date'] = Carbon::parse($data['invoice_date'])->format('m/d/Y');
+        $pdfData['due_date'] = Carbon::parse($data['due_date'])->format('m/d/Y');
+
+        $pdf = Pdf::loadView('pdf.invoice', $pdfData)->setPaper('letter');
+
+        Mail::send([], [], function ($message) use ($invoice, $pdf) {
+            $message
+                ->to($invoice->customer_email)
+                ->cc('pattylmcintosh@yahoo.com')
+                ->subject('Invoice ' . $invoice->invoice_no)
+                ->attachData($pdf->output(), 'invoice.pdf')
+                ->html('<p>Attached is your invoice.</p>');
+        });
+
+        return redirect()->route('invoice.history')
+            ->with('success', 'Invoice sent and saved.');
+    }
+
+    public function history(Request $request)
+    {
+        $invoices = Invoice::orderByDesc('sent_at')->paginate(20);
+        return view('invoice.history', compact('invoices'));
+    }
+
+    public function view(Invoice $invoice)
+    {
+        $items = json_decode($invoice->items ?? '[]', true);
+
+        $pdf = Pdf::loadView('pdf.invoice', [
+            'invoice_no'     => $invoice->invoice_no,
+            'customer_name'  => $invoice->customer_name,
+            'customer_email' => $invoice->customer_email,
+            'street_address' => $invoice->street_address,
+            'city_state_zip' => $invoice->city_state_zip,
+            'invoice_date'   => optional($invoice->invoice_date)->format('m/d/Y'),
+            'due_date'       => optional($invoice->due_date)->format('m/d/Y'),
+            'items'          => $items,
+            'sub_total'      => $invoice->total,
+            'grand_total'    => $invoice->total,
+            'notes'          => $invoice->notes,
+        ]);
+
+        return $pdf->stream('invoice.pdf');
+    }
+}
