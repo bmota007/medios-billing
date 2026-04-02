@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('customers', function (Blueprint $table) {
-            //
+            // ✅ We add the missing anchor column here
+            if (!Schema::hasColumn('customers', 'billing_address')) {
+                $table->text('billing_address')->nullable()->after('phone');
+            }
         });
     }
 
@@ -22,7 +25,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('customers', function (Blueprint $table) {
-            //
+            $table->dropColumn('billing_address');
         });
     }
 };

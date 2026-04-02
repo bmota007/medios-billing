@@ -1,198 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>{{ (isset($is_receipt) && $is_receipt) ? 'Payment Receipt' : 'Invoice' }}</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #374151; line-height: 1.6; }
+        .container { max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; }
+        .logo-container { text-align: center; margin-bottom: 25px; }
+        .button {
+            background-color: #38bdf8;
+            color: white !important;
+            padding: 16px 30px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            border-radius: 10px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .summary-box { background: #f9fafb; border-radius: 8px; padding: 20px; border: 1px solid #f3f4f6; }
+        .footer { font-size: 12px; color: #9ca3af; text-align: center; margin-top: 30px; }
+    </style>
 </head>
-
-<body style="font-family:Arial, Helvetica, sans-serif; background:#f4f6f9; padding:30px; margin:0;">
+<body>
 
 @php
-    // SaaS-ready branding with safe fallbacks
-    $companyName = $company_name ?? 'McIntosh Cleaning Services';
-    $companyLogo = $company_logo ?? 'https://portal.mcintoshcleaningservice.com/images/mcintosh-logo.png';
+    $companyName = $invoice->company->name ?? 'Medios Billing User';
+    // Fallback logo if company hasn't uploaded one
+    $companyLogo = !empty($invoice->company->logo_path) 
+        ? asset('storage/' . $invoice->company->logo_path) 
+        : 'https://portal.mcintoshcleaningservice.com/images/mcintosh-logo.png';
 @endphp
 
-<div style="max-width:600px; margin:auto; background:white; padding:30px; border-radius:8px; border:1px solid #e5e7eb;">
-
-    <!-- COMPANY LOGO (SaaS READY) -->
-    <div style="text-align:center; margin-bottom:25px;">
-        <img
-            src="{{ $companyLogo }}"
-            alt="{{ $companyName }} Logo"
-            style="max-width:220px; height:auto; display:inline-block;">
+<div class="container">
+    <div class="logo-container">
+        <img src="{{ $companyLogo }}" alt="{{ $companyName }}" style="max-width: 180px; height: auto;">
     </div>
 
-    <!-- HEADER -->
-    <h2 style="margin-top:0; color:#111827;">
+    <h2>Hello {{ $invoice->customer_name }},</h2>
 
-        @if(isset($is_receipt) && $is_receipt)
-
-            Receipt #{{ $invoice->invoice_no }}
-
-            <span style="
-                background:#16a34a;
-                color:white;
-                font-size:12px;
-                padding:4px 10px;
-                border-radius:20px;
-                margin-left:10px;
-                font-weight:bold;
-                display:inline-block;
-                vertical-align:middle;
-            ">
-                PAID
-            </span>
-
-        @else
-
-            Invoice #{{ $invoice->invoice_no }}
-
-        @endif
-
-    </h2>
-
-    <p style="font-size:15px; color:#374151; margin:0 0 10px 0;">
-        Hello {{ $invoice->customer_name }},
-    </p>
-
-    <!-- INVOICE SUMMARY BOX -->
-    <div style="
-        margin:25px 0;
-        border:1px solid #e5e7eb;
-        border-radius:6px;
-        padding:20px;
-        background:#f9fafb;
-    ">
-
-        <p style="margin:0 0 10px 0; font-weight:bold; color:#111827;">
-            Invoice Summary
-        </p>
-
-        <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px; color:#374151;">
-
-            <tr>
-                <td style="padding:6px 0;">Invoice Number</td>
-                <td style="text-align:right; padding:6px 0;">
-                    <strong>{{ $invoice->invoice_no }}</strong>
-                </td>
-            </tr>
-
-            <tr>
-                <td style="padding:6px 0;">Amount</td>
-                <td style="text-align:right; padding:6px 0;">
-                    <strong>${{ number_format($invoice->total,2) }}</strong>
-                </td>
-            </tr>
-
-            <tr>
-                <td style="padding:6px 0;">Status</td>
-                <td style="text-align:right; padding:6px 0;">
-                    @if(isset($is_receipt) && $is_receipt)
-                        <span style="color:#16a34a; font-weight:bold;">PAID</span>
-                    @else
-                        <span style="color:#d97706; font-weight:bold;">PENDING</span>
-                    @endif
-                </td>
-            </tr>
-
-            @if(isset($is_receipt) && $is_receipt && !empty($invoice->paid_at))
-                <tr>
-                    <td style="padding:6px 0;">Payment Date</td>
-                    <td style="text-align:right; padding:6px 0;">
-                        {{ \Carbon\Carbon::parse($invoice->paid_at)->format('F j, Y g:i A') }}
-                    </td>
-                </tr>
-            @endif
-
-        </table>
-
-    </div>
-
-    <!-- MESSAGE -->
     @if(isset($is_receipt) && $is_receipt)
-
-        <p style="font-size:15px; color:#374151;">
-            We have successfully received your payment of
-            <strong>${{ number_format($invoice->total,2) }}</strong>.
-        </p>
-
-        @if(!empty($invoice->paid_at))
-            <p style="font-size:14px; color:#6b7280; margin-top:-5px;">
-                Payment received on
-                <strong>{{ \Carbon\Carbon::parse($invoice->paid_at)->format('F j, Y \a\t g:i A') }}</strong>
-            </p>
-        @endif
-
-        <p style="font-size:15px; color:#374151;">
-            Your payment has been processed successfully and your receipt is attached for your records.
-        </p>
-
+        <p>Thank you for your payment! Your receipt for <strong>Invoice #{{ $invoice->invoice_no }}</strong> is confirmed and attached for your records.</p>
     @else
-
-        <p style="font-size:15px; color:#374151;">
-            Your invoice for
-            <strong>${{ number_format($invoice->total,2) }}</strong>
-            has been generated.
-        </p>
-
-        <p style="font-size:15px; color:#374151;">
-            Please review the attached invoice for service details and payment instructions.
-        </p>
-
-    @endif
-
-    <!-- PAYMENT BUTTON -->
-    @if((!isset($is_receipt) || !$is_receipt) && (($invoice->status ?? null) !== 'paid'))
-
-        <div style="margin:35px 0; text-align:center;">
-
-            <a href="{{ route('invoice.payment.page', ['invoice' => $invoice->id]) }}"
-               style="
-               display:inline-block;
-               background:#2563eb;
-               color:white;
-               padding:14px 26px;
-               text-decoration:none;
-               border-radius:6px;
-               font-weight:bold;
-               font-size:15px;
-               ">
-                Pay Securely with Credit Card
-            </a>
-
+        <p>You have received a new invoice from <strong>{{ $companyName }}</strong>.</p>
+        
+        <div class="summary-box">
+            <p style="margin: 0;"><strong>Invoice #:</strong> {{ $invoice->invoice_no }}</p>
+            <p style="margin: 5px 0;"><strong>Amount Due:</strong> ${{ number_format($invoice->total, 2) }}</p>
+            <p style="margin: 0;"><strong>Due Date:</strong> {{ \Carbon\Carbon::parse($invoice->due_date)->format('M d, Y') }}</p>
         </div>
 
-        <p style="font-size:14px; color:#374151;">
-            You may also pay using <strong>Zelle, Cash, or Check</strong>.
-        </p>
+        <div style="text-align: center;">
+            <a href="{{ route('invoice.public_view', $invoice->invoice_no) }}" class="button">
+                VIEW & PAY INVOICE ONLINE
+            </a>
+        </div>
 
+        <p style="font-size: 13px; color: #6b7280;">If the button above does not work, please use the following link:<br>
+        {{ route('invoice.public_view', $invoice->invoice_no) }}</p>
     @endif
 
-    <!-- DIVIDER -->
-    <hr style="border:none; border-top:1px solid #e5e7eb; margin:30px 0;">
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+    
+    <p>Thank you for your business,<br>
+    <strong>{{ $companyName }}</strong></p>
 
-    <!-- FOOTER -->
-    <p style="font-size:15px; color:#374151; margin:0 0 8px 0;">
-        Thank you for choosing <strong>{{ $companyName }}</strong>.
-    </p>
-
-    <p style="font-size:14px; color:#6b7280; margin:0;">
-        If you have any questions regarding this invoice or receipt, please reply to this email and our team will be happy to assist you.
-    </p>
-
-    <p style="font-size:12px; color:#9ca3af; margin-top:25px;">
-        {{ $companyName }}<br>
-        Professional Residential &amp; Commercial Cleaning
-    </p>
-
-    <p style="font-size:11px; color:#9ca3af; margin-top:15px; text-align:center;">
-        Powered by
-        <a href="https://www.medioscorporativos.com" style="color:#6b7280; text-decoration:none;">
-            MediosCorp Billing System
-        </a>
-    </p>
-
+    <div class="footer">
+        Powered by MediosCorp Billing System
+    </div>
 </div>
 
 </body>

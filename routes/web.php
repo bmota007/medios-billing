@@ -8,194 +8,171 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\QuoteController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\BillingController;
+use App\Http\Controllers\StripeWebhookController;
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes
+| PUBLIC ROUTES
 |--------------------------------------------------------------------------
 */
-
-
-/*
-|--------------------------------------------------------------------------
-| Root Redirect
-|--------------------------------------------------------------------------
-*/
-
 Route::get('/', function () {
-
     if (Auth::check()) {
-
-        if (auth()->user()->is_admin) {
-            return redirect()->route('admin.dashboard');
-        }
-
-        return redirect()->route('dashboard');
+        return auth()->user()->role === 'super_admin'
+            ? redirect()->route('admin.dashboard')
+            : redirect()->route('dashboard');
     }
-
     return redirect()->route('login');
-
 });
 
+Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
+Route::post('/register', [RegisterController::class, 'register']);
 
 /*
 |--------------------------------------------------------------------------
-| PUBLIC PAYMENT ROUTES
+| STRIPE WEBHOOK
 |--------------------------------------------------------------------------
 */
-
-Route::get('/payments', [InvoiceController::class,'paymentPage'])
-    ->name('invoice.payment.page');
-
-Route::post('/payments/checkout', [InvoiceController::class,'checkout'])
-    ->name('invoice.checkout');
-
-Route::get('/payments/success', [InvoiceController::class,'success'])
-    ->name('invoice.payment.success');
-
-Route::post('/stripe/webhook', [InvoiceController::class,'stripeWebhook'])
-    ->name('stripe.webhook');
-
+Route::post('/stripe/webhook', [StripeWebhookController::class, 'handle'])->name('stripe.webhook');
 
 /*
 |--------------------------------------------------------------------------
-| AUTH PROTECTED ROUTES
+| PUBLIC INVOICE & PAYMENT ROUTES
 |--------------------------------------------------------------------------
 */
-
-Route::middleware(['auth'])->group(function () {
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Shared SaaS Dashboard
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/dashboard',[DashboardController::class,'index'])
-        ->name('dashboard');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | COMPANY SETTINGS
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/settings/company',[CompanyController::class,'settings'])
-        ->name('company.settings');
-
-    Route::post('/settings/company',[CompanyController::class,'update'])
-        ->name('company.update');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CUSTOMER MANAGEMENT
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/customers',[InvoiceController::class,'customersIndex'])
-        ->name('customers.index');
-
-    Route::get('/customers/create',[InvoiceController::class,'customersCreate'])
-        ->name('customers.create');
-
-    Route::post('/customers/store',[InvoiceController::class,'customersStore'])
-        ->name('customers.store');
-
-    Route::get('/customers/{customer}/edit',[InvoiceController::class,'customersEdit'])
-        ->name('customers.edit');
-
-    Route::put('/customers/{customer}',[InvoiceController::class,'customersUpdate'])
-        ->name('customers.update');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | PROFILE
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/profile',[ProfileController::class,'edit'])
-        ->name('profile.edit');
-
-    Route::patch('/profile',[ProfileController::class,'update'])
-        ->name('profile.update');
-
-    Route::delete('/profile',[ProfileController::class,'destroy'])
-        ->name('profile.destroy');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | INVOICE SYSTEM
-    |--------------------------------------------------------------------------
-    */
-
-    Route::match(['get','post'],'/invoice',[InvoiceController::class,'showForm'])
-        ->name('invoice.form');
-
-    Route::get('/invoice/create',[InvoiceController::class,'createInvoice'])
-        ->name('invoice.create');
-
-    Route::post('/invoice/preview',[InvoiceController::class,'preview'])
-        ->name('invoice.preview');
-
-    Route::post('/invoice/send',[InvoiceController::class,'send'])
-        ->name('invoice.send');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | INVOICE HISTORY
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/invoices',[InvoiceController::class,'history'])
-        ->name('invoice.history');
-
-    Route::get('/invoice/{invoice}',[InvoiceController::class,'view'])
-        ->name('invoice.view');
-
-    Route::get('/invoice/{invoice}/receipt',[InvoiceController::class,'receipt'])
-        ->name('invoice.receipt');
-
-    Route::post('/invoice/{invoice}/resend',[InvoiceController::class,'resend'])
-        ->name('invoice.resend');
-
-    Route::post('/invoice/{invoice}/resend-receipt',[InvoiceController::class,'resendReceipt'])
-        ->name('invoice.resendReceipt');
-
-    Route::post('/invoice/{invoice}/mark-paid',[InvoiceController::class,'markPaid'])
-        ->name('invoice.markPaid');
-
-    Route::delete('/invoice/{invoice}',[InvoiceController::class,'destroy'])
-        ->name('invoice.destroy');
-
-    Route::get('/invoices/export/csv',[InvoiceController::class,'exportCsv'])
-        ->name('invoice.export.csv');
-
-});
-
+Route::get('/invoice/view/{invoice_no}', [InvoiceController::class, 'publicView'])->name('invoice.public_view'); 
+Route::get('/invoice/pay/{invoice_no}', [InvoiceController::class, 'showPaymentPage'])->name('invoice.pay');
+Route::post('/invoice/checkout/{invoice_no}', [InvoiceController::class, 'stripeCheckout'])->name('invoice.checkout');
+Route::get('/invoice/success/{invoice_no}', [InvoiceController::class, 'stripeSuccess'])->name('stripe.success');
+Route::post('/invoice/{invoice}/manual-payment', [InvoiceController::class, 'submitManualPayment'])->name('invoice.manual.payment');
 
 /*
 |--------------------------------------------------------------------------
-| SUPER ADMIN PANEL
+| PUBLIC QUOTES
 |--------------------------------------------------------------------------
 */
+Route::get('/q/{token}', [QuoteController::class, 'publicView'])->name('quotes.public');
+Route::post('/q/{token}/approve', [QuoteController::class, 'approve'])->name('quotes.approve');
+Route::get('/q/{token}/contract', [QuoteController::class, 'showContract'])->name('quotes.contract');
+Route::post('/q/{token}/contract/sign', [QuoteController::class, 'signContract'])->name('quotes.contract.sign');
+Route::get('/quote/{id}/contract-view', [QuoteController::class, 'viewContractFile'])->name('quotes.contract.view');
 
-Route::middleware(['auth','superadmin'])->group(function () {
+/*
+|--------------------------------------------------------------------------
+| LOGOUT
+|--------------------------------------------------------------------------
+*/
+Route::post('/logout', function () {
+    Auth::logout();
+    request()->session()->invalidate();
+    request()->session()->regenerateToken();
+    return redirect()->route('login');
+})->name('logout');
 
-    Route::get('/admin',[AdminController::class,'dashboard'])
-        ->name('admin.dashboard');
-
-    Route::get('/admin/companies',[AdminController::class,'companies'])
-        ->name('admin.companies');
-
-    Route::get('/admin/company/{id}',[AdminController::class,'company']);
-
+/*
+|--------------------------------------------------------------------------
+| BILLING (NOT LOCKED)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('/subscribe', function () { return view('billing.subscribe'); })->name('subscribe');
+    Route::post('/process-subscription', [BillingController::class, 'processSubscription'])->name('process.subscription');
+    Route::post('/billing/pay', [BillingController::class, 'processSubscription'])->name('billing.pay');
 });
 
+Route::get('/billing/expired', [BillingController::class, 'expired'])->name('billing.expired');
+Route::get('/billing-locked', function () { return view('billing.locked'); })->name('billing.locked');
 
-require __DIR__.'/auth.php';
+/*
+|--------------------------------------------------------------------------
+| TENANT / BUSINESS ROUTES (LOCKED)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'check.subscription'])->group(function () {
+
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Customers
+    Route::resource('customers', CustomerController::class);
+    Route::delete('/customers/{customer}/delete', [CustomerController::class, 'destroy'])->name('customers.delete');
+
+    // Quotes
+    Route::resource('quotes', QuoteController::class);
+    Route::get('/quotes/{quote}/download', [QuoteController::class, 'downloadPdf'])->name('quotes.download');
+    Route::post('/quotes/{quote}/send', [QuoteController::class, 'send'])->name('quotes.send');
+    Route::post('/quotes/{quote}/convert', [QuoteController::class, 'convertToInvoice'])->name('quotes.convert');
+
+    /*
+    |--------------------------------------------------------------------------
+    | INVOICES MANAGEMENT (CLEANED & FIXED)
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/invoices', [InvoiceController::class, 'history'])->name('invoice.history');
+    Route::get('/invoice/create', [InvoiceController::class, 'showForm'])->name('invoice.create');
+    Route::post('/invoice/send', [InvoiceController::class, 'send'])->name('invoice.send');
+    
+    // Management Routes
+    Route::get('/invoice/edit/{invoice}', [InvoiceController::class, 'edit'])->name('invoice.edit');
+    Route::put('/invoice/update/{invoice}', [InvoiceController::class, 'update'])->name('invoice.update');
+
+    Route::post('/invoice/{invoice}/resend', [InvoiceController::class, 'resend'])->name('invoice.resend');
+    Route::post('/invoice/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])->name('invoice.markPaid');
+    Route::post('/invoice/send-email/{invoice_no}', [InvoiceController::class, 'sendEmail'])->name('invoice.send_email');
+
+    Route::get('/invoice/{invoice}/download', [InvoiceController::class, 'downloadPdf'])->name('invoice.download');
+    Route::delete('/invoice/{invoice}', [InvoiceController::class, 'destroy'])->name('invoice.destroy');
+
+    // Internal View
+    Route::get('/invoice/internal/{invoice}', [InvoiceController::class, 'view'])->name('invoice.view');
+
+    // Settings
+    Route::get('/company/settings', [CompanyController::class, 'settings'])->name('company.settings');
+    Route::post('/company/settings', [CompanyController::class, 'update'])->name('company.update');
+
+    // Users
+    Route::get('/company/users', [UserController::class, 'index'])->name('company.users');
+    Route::get('/company/users/create', [UserController::class, 'create'])->name('company.users.create');
+    Route::post('/company/users/store', [UserController::class, 'store'])->name('company.users.store');
+
+    // Profile
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+});
+
+/*
+|--------------------------------------------------------------------------
+| SUPER ADMIN
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'superadmin'])->prefix('admin')->group(function () {
+    
+    // ✅ FIX: Redirect root /admin to the dashboard to prevent 404
+    Route::get('/', function () { 
+        return redirect()->route('admin.dashboard'); 
+    });
+
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+    
+    // ✅ Restored the missing destroy route that was showing in your error logs
+    Route::delete('/companies/{id}', [AdminController::class, 'destroyCompany'])->name('admin.companies.destroy');
+    
+    Route::get('/brand', [CompanyController::class, 'settings'])->name('admin.brand');
+    Route::post('/brand', [CompanyController::class, 'update'])->name('admin.brand.update');
+    
+    Route::get('/companies', [AdminController::class, 'companies'])->name('admin.companies');
+    Route::get('/companies/create', [AdminController::class, 'createCompany'])->name('admin.companies.create');
+    
+    Route::post('/companies/store', [AdminController::class, 'storeCompany'])->name('admin.companies.store');
+    Route::post('/companies/{id}/toggle', [AdminController::class, 'toggleStatus'])->name('admin.companies.toggle');
+    
+    Route::get('/impersonate/{id}', [AdminController::class, 'loginAsCompany'])->name('admin.impersonate');
+    Route::get('/stop-impersonating', [AdminController::class, 'stopImpersonating'])->name('admin.stopImpersonating');
+    
+    Route::get('/billing', [AdminController::class, 'billing'])->name('admin.billing');
+});
+
+require __DIR__ . '/auth.php';

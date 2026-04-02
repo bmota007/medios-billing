@@ -26,7 +26,8 @@ class InvoicePaidMail extends Mailable
      */
     public function build()
     {
+        // This ensures the "Blue Bar" template (payment_received) is used
         return $this->subject('Payment Received - Invoice #' . $this->invoice->invoice_no)
-                    ->view('emails.invoice_paid');
+                    ->view('emails.payment_received');
     }
 }

@@ -21,7 +21,7 @@
     justify-content:space-between;
     align-items:center;
   }
-  .actions { display:flex; gap:10px; align-items:center; }
+  .actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .btn {
     padding:8px 14px;
     font-size:14px;
@@ -50,31 +50,12 @@
 
   <div class="actions">
 
-    {{-- ===============================
-         PREVIEW MODE (NOT SAVED YET)
-    =============================== --}}
     @if(!isset($invoiceId))
 
         {{-- BACK --}}
-        <form method="POST" action="{{ route('invoice.form') }}">
-            @csrf
-
-            <input type="hidden" name="customer_name" value="{{ $customer_name }}">
-            <input type="hidden" name="customer_email" value="{{ $customer_email }}">
-            <input type="hidden" name="street_address" value="{{ $street_address }}">
-            <input type="hidden" name="city_state_zip" value="{{ $city_state_zip }}">
-            <input type="hidden" name="invoice_date" value="{{ $invoice_date }}">
-            <input type="hidden" name="due_date" value="{{ $due_date }}">
-            <input type="hidden" name="notes" value="{{ $notes ?? '' }}">
-
-            @foreach($items as $i => $it)
-                <input type="hidden" name="items[{{ $i }}][desc]" value="{{ $it['desc'] }}">
-                <input type="hidden" name="items[{{ $i }}][qty]" value="{{ $it['qty'] }}">
-                <input type="hidden" name="items[{{ $i }}][price]" value="{{ $it['price'] }}">
-            @endforeach
-
-            <button class="btn btn-back">Back</button>
-        </form>
+        <a href="{{ route('invoice.create') }}" class="btn btn-back">
+            Back
+        </a>
 
         {{-- SEND --}}
         <form method="POST" action="{{ route('invoice.send') }}">
@@ -94,73 +75,79 @@
                 <input type="hidden" name="items[{{ $i }}][price]" value="{{ $it['price'] }}">
             @endforeach
 
-            <button class="btn btn-send">Send Invoice</button>
+            <button type="submit" class="btn btn-send">Send Invoice</button>
         </form>
 
-{{-- ===============================
-     SAVED INVOICE MODE
-=============================== --}}
-@else
+    @else
 
-    {{-- VIEW INVOICE --}}
-    @if(isset($invoiceId))
-        <a href="{{ route('invoice.view', $invoiceId) }}" class="btn btn-back">
-            View Invoice
-        </a>
+        @if(isset($invoiceId))
+            <a href="{{ route('invoice.view', $invoiceId) }}" class="btn btn-back">
+                View Invoice
+            </a>
+        @endif
+
+        @if(isset($status) && strtolower($status) === 'unpaid' && isset($invoiceId))
+            <form method="POST" action="{{ route('invoice.markPaid', $invoiceId) }}" style="display:inline;">
+                @csrf
+                <button type="submit" class="btn btn-success">
+                    Mark Paid
+                </button>
+            </form>
+        @endif
+
+        @if(isset($invoiceId))
+            <form method="POST" action="{{ route('invoice.destroy', $invoiceId) }}"
+                  style="display:inline;"
+                  onsubmit="return confirm('Are you sure you want to delete this invoice?');">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn btn-exit">
+                    Delete
+                </button>
+            </form>
+        @endif
+
     @endif
 
-    {{-- VIEW RECEIPT (ONLY IF PAID) --}}
-    @if(isset($status) && strtolower($status) === 'paid' && isset($invoiceId))
-        <a href="{{ route('invoice.receipt', $invoiceId) }}" class="btn btn-success">
-            View Receipt
-        </a>
-    @endif
+    <a href="{{ route('invoice.history') }}" class="btn btn-exit">
+        Exit
+    </a>
 
-    {{-- MARK PAID (ONLY IF UNPAID) --}}
-    @if(isset($status) && strtolower($status) === 'unpaid' && isset($invoiceId))
-        <form method="POST" action="{{ route('invoice.markPaid', $invoiceId) }}" style="display:inline;">
-            @csrf
-            <button type="submit" class="btn btn-success">
-                Mark Paid
-            </button>
-        </form>
-    @endif
-
-    {{-- RESEND RECEIPT (ONLY IF PAID) --}}
-    @if(isset($status) && strtolower($status) === 'paid' && isset($invoiceId))
-        <form method="POST" action="{{ route('invoice.resendReceipt', $invoiceId) }}" style="display:inline;">
-            @csrf
-            <button type="submit" class="btn btn-success">
-                Resend Receipt
-            </button>
-        </form>
-    @endif
-
-    {{-- DELETE INVOICE --}}
-    @if(isset($invoiceId))
-        <form method="POST" action="{{ route('invoice.destroy', $invoiceId) }}"
-              style="display:inline;"
-              onsubmit="return confirm('Are you sure you want to delete this invoice?');">
-            @csrf
-            @method('DELETE')
-            <button type="submit" class="btn btn-exit">
-                Delete
-            </button>
-        </form>
-    @endif
-
-@endif
-
-{{-- EXIT --}}
-<a href="{{ route('invoice.history') }}" class="btn btn-exit">
-    Exit
-</a>
-
-</div>
+  </div>
 </div>
 
 <div class="pdf-wrap">
-    <iframe src="data:application/pdf;base64,{{ $pdf_base64 }}"></iframe>
+<div class="container">
+
+    <h2>Invoice #{{ $invoice_no }}</h2>
+
+    <div>
+        <strong>Customer:</strong> {{ $customer_name }}
+    </div>
+
+    <table width="100%" border="1" cellspacing="0" cellpadding="8" style="margin-top:15px;">
+        <tr>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Total</th>
+        </tr>
+
+        @foreach($items as $item)
+        <tr>
+            <td>{{ $item['service_name'] ?? $item['desc'] ?? '' }}</td>
+            <td>{{ $item['qty'] ?? $item['quantity'] ?? 1 }}</td>
+            <td>${{ number_format($item['price'] ?? $item['unit_price'] ?? 0, 2) }}</td>
+            <td>${{ number_format($item['line_total'] ?? 0, 2) }}</td>
+        </tr>
+        @endforeach
+    </table>
+
+    <div style="margin-top:20px;">
+        <strong>Subtotal:</strong> ${{ number_format($sub_total,2) }}<br>
+        <strong>Total:</strong> ${{ number_format($grand_total,2) }}
+    </div>
+
 </div>
 
 </body>

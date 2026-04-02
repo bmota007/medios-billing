@@ -1,248 +1,101 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Invoice History</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+@extends('layouts.admin')
 
-<style>
-body {
-    font-family: Arial, sans-serif;
-    background: #f4f4f4;
-    margin: 0;
-    padding: 20px;
-}
-
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.header-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-h1 { margin: 0; }
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #fff;
-}
-
-th, td {
-    padding: 12px;
-    border-bottom: 1px solid #ddd;
-    text-align: left;
-}
-
-th { background: #f0f0f0; }
-
-.search-box { margin-bottom: 15px; }
-
-.search-box input {
-    padding: 8px;
-    width: 280px;
-}
-
-.btn {
-    padding: 8px 14px;
-    background: #0657bd;
-    color: #fff;
-    border: none;
-    cursor: pointer;
-    border-radius: 6px;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 14px;
-    margin-right: 6px;
-}
-
-.btn:hover { opacity: 0.9; }
-
-.logout-btn {
-    background: none;
-    border: none;
-    color: #cc0000;
-    cursor: pointer;
-    text-decoration: underline;
-    font-size: 14px;
-}
-
-.status-paid {
-    background:#6ac259;
-    color:white;
-    padding:6px 10px;
-    border-radius:4px;
-    font-size:12px;
-    font-weight:bold;
-}
-
-.status-unpaid {
-    background:#e74c3c;
-    color:white;
-    padding:6px 10px;
-    border-radius:4px;
-    font-size:12px;
-    font-weight:bold;
-}
-
-.mark-paid-form select,
-.mark-paid-form input {
-    padding: 5px;
-    font-size: 12px;
-}
-</style>
-</head>
-
-<body>
-
-<div class="header">
-
-    <div class="header-left">
-        <h1>Invoice History</h1>
-
-        <a href="{{ route('invoice.form') }}"
-           class="btn"
-           style="background:#2563eb;">
-            + Create Invoice
-        </a>
-
-        <a href="{{ route('admin.dashboard') }}"
-           class="btn"
-           style="background:#111827;">
-            Dashboard
-        </a>
+@section('content')
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h2 class="text-white font-bold mb-1">Invoice <span class="text-sky-400">History</span></h2>
+            <p class="text-secondary small">Manage and track all business billing records</p>
+        </div>
+        <div class="d-flex gap-3">
+            <a href="{{ route('invoice.create') }}" class="btn btn-primary px-4 shadow-lg">
+                <i class="fa-solid fa-plus-circle mr-2"></i> Create Invoice
+            </a>
+        </div>
     </div>
 
-    <form method="POST" action="{{ route('logout') }}">
-        @csrf
-        <button type="submit" class="logout-btn">Log out</button>
-    </form>
+    @if(session('success'))
+        <div class="alert alert-success mb-4">{{ session('success') }}</div>
+    @endif
 
+    <div class="glass-card mb-4 py-3">
+        <form method="GET" action="{{ route('invoice.history') }}" class="row g-3 align-items-center px-3">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-slate-900 border-slate-700 text-secondary border-end-0">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" name="search" class="form-control bg-slate-900 border-slate-700 text-white border-start-0" placeholder="Search name, email or #..." value="{{ request('search') }}">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-info w-100 font-bold">Search</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="glass-card">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead class="text-secondary small uppercase tracking-wider">
+                    <tr>
+                        <th class="border-0">Invoice #</th>
+                        <th class="border-0">Customer</th>
+                        <th class="border-0 text-center">Total</th>
+                        <th class="border-0 text-center">Status</th>
+                        <th class="border-0 text-end">Management</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
+                    @forelse ($invoices as $inv)
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05)">
+                            <td class="py-4">
+                                <a href="{{ route('invoice.view', $inv->invoice_no) }}" class="text-sky-400 font-mono font-bold text-decoration-none">
+                                    #{{ $inv->invoice_no }}
+                                </a>
+                            </td>
+
+                            <td>
+                                <div class="text-white font-bold">{{ $inv->customer_name }}</div>
+                                <div class="text-secondary small">{{ $inv->customer_email }}</div>
+                            </td>
+
+                            <td class="text-center text-white font-bold">
+                                ${{ number_format($inv->total, 2) }}
+                            </td>
+
+                            <td class="text-center">
+                                @if($inv->status === 'paid')
+                                    <span class="badge status-badge status-paid"><i class="fa-solid fa-check-circle mr-1"></i> PAID</span>
+                                @else
+                                    <span class="badge status-badge status-unpaid"><i class="fa-solid fa-circle-exclamation mr-1"></i> UNPAID</span>
+                                @endif
+                            </td>
+
+                            <td class="text-end">
+                                <div class="d-flex justify-content-end align-items-center gap-2">
+                                    <a href="{{ route('invoice.view', $inv->invoice_no) }}" class="btn btn-sm btn-outline-info" title="View/Manage">
+                                        <i class="fa-solid fa-eye"></i> View
+                                    </a>
+
+                                    <form method="POST" action="{{ route('invoice.destroy', $inv->id) }}" onsubmit="return confirm('Delete this invoice?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="text-center py-5 text-secondary">No invoices found.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        {{ $invoices->links() }}
+    </div>
 </div>
-
-<div class="search-box">
-    <form method="GET" action="{{ route('invoice.history') }}">
-        <input
-            type="text"
-            name="search"
-            placeholder="Search name or email…"
-            value="{{ request('search') }}"
-        >
-        <button type="submit" class="btn">Search</button>
-    </form>
-</div>
-
-<table>
-<thead>
-<tr>
-    <th>Invoice #</th>
-    <th>Customer</th>
-    <th>Email</th>
-    <th>Total</th>
-    <th>Sent</th>
-    <th>Actions</th>
-    <th>Status</th>
-</tr>
-</thead>
-
-<tbody>
-@forelse ($invoices as $inv)
-<tr>
-
-    <td>
-        <a href="{{ route('invoice.view', $inv) }}"
-           target="_blank"
-           style="color:#0657bd; font-weight:bold; text-decoration:underline;">
-            {{ $inv->invoice_no }}
-        </a>
-    </td>
-
-    <td>{{ $inv->customer_name }}</td>
-    <td>{{ $inv->customer_email }}</td>
-    <td>${{ number_format($inv->total, 2) }}</td>
-    <td>{{ optional($inv->sent_at)->format('m/d/Y H:i') }}</td>
-
-    <td>
-
-        <a href="{{ route('invoice.view', $inv) }}"
-           target="_blank"
-           class="btn">
-            View PDF
-        </a>
-
-        @if($inv->status !== 'paid')
-
-            <!-- Resend -->
-            <form method="POST"
-                  action="{{ route('invoice.resend', $inv) }}"
-                  style="display:inline;">
-                @csrf
-                <button type="submit"
-                        class="btn"
-                        style="background:#f39c12;">
-                    Resend
-                </button>
-            </form>
-
-            <!-- Mark Paid -->
-            <form method="POST"
-                  action="{{ route('invoice.markPaid', $inv->id) }}"
-                  class="mark-paid-form"
-                  style="display:inline-flex; gap:6px; align-items:center;">
-                @csrf
-
-                <select name="payment_method" required>
-                    <option value="">Method</option>
-                    <option value="zelle">Zelle</option>
-                    <option value="cash">Cash</option>
-                    <option value="check">Check</option>
-                </select>
-
-                <input type="text"
-                       name="check_number"
-                       placeholder="Check #"
-                       style="width:90px;">
-
-                <button type="submit"
-                        style="background:#10b981;
-                               color:white;
-                               padding:6px 10px;
-                               border-radius:6px;
-                               border:none;">
-                    Mark Paid
-                </button>
-            </form>
-
-        @endif
-
-    </td>
-
-    <td>
-        @if($inv->status === 'paid')
-            <span class="status-paid">✔ PAID</span>
-        @else
-            <span class="status-unpaid">UNPAID</span>
-        @endif
-    </td>
-
-</tr>
-@empty
-<tr>
-    <td colspan="7">No invoices found.</td>
-</tr>
-@endforelse
-</tbody>
-</table>
-
-<br>
-
-{{ $invoices->links() }}
-
-</body>
-</html>
+@endsection

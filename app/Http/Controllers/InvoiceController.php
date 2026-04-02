@@ -2,445 +2,256 @@
 
 namespace App\Http\Controllers;
 
+use Stripe\Stripe;
+use Stripe\Checkout\Session;
 use App\Models\Invoice;
 use App\Models\Customer;
-use Illuminate\Http\Request;
+use App\Models\Quote;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use App\Mail\InvoicePaidMail; // Corrected Mailable name
 
 class InvoiceController extends Controller
 {
-    /* =========================
-       SHOW FORM
-    ========================= */
-    public function showForm(Request $request)
+    /**
+     * 1. ADMINISTRATIVE VIEWS
+     */
+
+    public function showForm()
     {
-$customers = Customer::where('company_id', auth()->user()->company_id)
-                     ->orderBy('name')
-                     ->get();
+        $user = auth()->user();
+        $customers = Customer::where('company_id', $user->company_id)->orderBy('name')->get();
+        $company = $user->company;
+        return view('invoice.form', compact('customers', 'company'));
+    }
 
-        $selectedCustomer = null;
-
-        if ($request->filled('customer_id')) {
-            $selectedCustomer = Customer::find($request->customer_id);
+    public function history(Request $request)
+    {
+        $query = Invoice::where('company_id', auth()->user()->company_id);
+        if ($request->has('search')) {
+            $search = $request->get('search');
+            $query->where(function($q) use ($search) {
+                $q->where('customer_name', 'LIKE', "%{$search}%")
+                  ->orWhere('customer_email', 'LIKE', "%{$search}%")
+                  ->orWhere('invoice_no', 'LIKE', "%{$search}%");
+            });
         }
-
-        return view('invoice.form', compact('customers', 'selectedCustomer'));
-    }
-
-    /* =========================
-       PREVIEW BEFORE SAVE
-    ========================= */
-    public function preview(Request $request)
-    {
-        $data = $this->buildInvoiceData($request);
-
-        $data['invoice_date'] = Carbon::parse($data['invoice_date'])->format('m/d/Y');
-        $data['due_date']     = Carbon::parse($data['due_date'])->format('m/d/Y');
-        $data['notes']        = $this->limitNotes($data['notes'] ?? '');
-        $data['is_receipt']   = false;
-
-        $pdf = Pdf::loadView('pdf.invoice', $data);
-        $data['pdf_base64'] = base64_encode($pdf->output());
-
-        return view('invoice.preview', $data);
-    }
-
-    /* =========================
-       SAVE + SEND INVOICE
-    ========================= */
-    public function send(Request $request)
-    {
-        $data = $this->buildInvoiceData($request);
-
-        $invoice = Invoice::create([
-            'invoice_no'      => $data['invoice_no'],
-            'customer_name'   => $data['customer_name'],
-            'customer_email'  => $data['customer_email'],
-            'street_address'  => $data['street_address'],
-            'city_state_zip'  => $data['city_state_zip'],
-            'invoice_date'    => $data['invoice_date'],
-            'due_date'        => $data['due_date'],
-            'total'           => $data['grand_total'],
-            'notes'           => $data['notes'],
-            'items'           => $data['items'],
-            'sent_at'         => now(),
-            'status'          => 'unpaid',
-        ]);
-
-        $pdf = Pdf::loadView('pdf.invoice', $data);
-        $this->emailInvoice($invoice, $pdf);
-
-        return redirect()->route('invoice.history')
-            ->with('success', 'Invoice sent successfully.');
-    }
-
-    /* =========================
-       VIEW INVOICE
-    ========================= */
-    public function view(Invoice $invoice)
-    {
-        $sub_total = $this->calculateSubTotal($invoice);
-
-        $data = $this->buildSavedInvoiceData($invoice, $sub_total, false);
-
-        $pdf = Pdf::loadView('pdf.invoice', $data);
-        $pdf_base64 = base64_encode($pdf->output());
-
-        return view('invoice.preview', array_merge($data, [
-            'pdf_base64' => $pdf_base64,
-            'status'     => $invoice->status,
-            'invoiceId'  => $invoice->id,
-        ]));
-    }
-
-    /* =========================
-       VIEW RECEIPT
-    ========================= */
-    public function receipt(Invoice $invoice)
-    {
-        if ($invoice->status !== 'paid') {
-            return redirect()->route('invoice.view', $invoice->id);
-        }
-
-        $sub_total = $this->calculateSubTotal($invoice);
-
-        $data = $this->buildSavedInvoiceData($invoice, $sub_total, true);
-
-        $pdf = Pdf::loadView('pdf.invoice', $data);
-        $pdf_base64 = base64_encode($pdf->output());
-
-        return view('invoice.preview', array_merge($data, [
-            'pdf_base64' => $pdf_base64,
-            'status'     => 'paid',
-            'invoiceId'  => $invoice->id,
-        ]));
-    }
-
-    /* =========================
-       DELETE INVOICE
-    ========================= */
-    public function destroy(Invoice $invoice)
-    {
-        $invoice->delete();
-
-        return redirect()
-            ->route('invoice.history')
-            ->with('success', 'Invoice deleted successfully.');
-    }
-
-/* =========================
-   RESEND RECEIPT
-========================= */
-public function resendReceipt(Invoice $invoice)
-{
-    if ($invoice->status !== 'paid') {
-        return back()->withErrors([
-            'error' => 'Receipt can only be resent for paid invoices.'
-        ]);
-    }
-
-    $sub_total = $this->calculateSubTotal($invoice);
-
-    $data = $this->buildSavedInvoiceData($invoice, $sub_total, true);
-
-    // Generate receipt PDF
-    $pdf = Pdf::loadView('pdf.invoice', $data);
-
-    // Send receipt email again
-    Mail::send('emails.invoice', [
-        'invoice' => $invoice,
-        'is_receipt' => true
-    ], function ($message) use ($invoice, $pdf) {
-
-        $message->to($invoice->customer_email)
-            ->subject('Payment Received – Receipt #' . $invoice->invoice_no . ' | McIntosh Cleaning Services')
-            ->attachData(
-                $pdf->output(),
-                'receipt-' . $invoice->invoice_no . '.pdf',
-                ['mime' => 'application/pdf']
-            );
-    });
-
-    return back()->with('success', 'Receipt resent successfully.');
-}
-
-    /* =========================
-       HISTORY
-    ========================= */
-    public function history()
-    {
-        $invoices = Invoice::orderBy('created_at', 'desc')->paginate(15);
+        $invoices = $query->latest()->paginate(15);
         return view('invoice.history', compact('invoices'));
     }
 
-/* =========================
-   MARK PAID
-========================= */
-public function markPaid(Request $request, Invoice $invoice)
-{
-    $invoice->update([
-        'status'  => 'paid',
-        'paid_at' => now(),
-    ]);
+    public function view($id_or_no)
+    {
+        $invoice = Invoice::with('company')
+            ->where('invoice_no', $id_or_no)
+            ->orWhere('id', $id_or_no) 
+            ->firstOrFail();
 
-    // Calculate subtotal
-    $sub_total = 0;
+        if ((int)$invoice->company_id !== (int)auth()->user()->company_id) {
+            abort(403, 'Unauthorized access to this invoice.');
+        }
 
-    if (is_array($invoice->items)) {
-        foreach ($invoice->items as $item) {
-            $sub_total += $item['line_total'] ?? 0;
+        $items = json_decode($invoice->items, true) ?? [];
+        return view('invoice.public_view', compact('invoice', 'items'));
+    }
+
+    public function edit($id_or_no)
+    {
+        $invoice = Invoice::where('invoice_no', $id_or_no)->orWhere('id', $id_or_no)->firstOrFail();
+        $customers = Customer::where('company_id', auth()->user()->company_id)->get();
+        return view('invoice.form', compact('invoice', 'customers'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $invoice = Invoice::findOrFail($id);
+        $invoice->customer_name = $request->customer_name;
+        $invoice->customer_email = $request->customer_email;
+        $invoice->items = json_encode($request->items ?? []);
+        
+        $total = 0;
+        foreach ($request->items as $item) {
+            $total += ($item['qty'] ?? 1) * ($item['price'] ?? 0);
+        }
+        $invoice->total = $total;
+        $invoice->save();
+
+        return redirect()->route('invoice.view', $invoice->invoice_no)->with('success', 'Invoice Updated Successfully!');
+    }
+
+    /**
+     * 2. CORE ACTIONS
+     */
+
+    public function send(Request $request)
+    {
+        $company = auth()->user()->company;
+        $invoice = new Invoice();
+        $invoice->company_id = $company->id;
+        $invoice->customer_name = $request->customer_name;
+        $invoice->customer_email = $request->customer_email;
+        $invoice->street_address = $request->street_address;
+        $invoice->city_state_zip = $request->city_state_zip;
+        $invoice->invoice_date = $request->invoice_date;
+        $invoice->due_date = $request->due_date;
+        $invoice->invoice_no = 'INV-' . time();
+        
+        $items = $request->items ?? [];
+        $invoice->items = json_encode($items);
+
+        $total = 0;
+        foreach ($items as $item) {
+            $total += ($item['qty'] ?? 1) * ($item['price'] ?? 0);
+        }
+        
+        $invoice->total = $total;
+        $invoice->status = 'pending';
+        $invoice->save();
+
+        return redirect()->route('invoice.view', $invoice->invoice_no)->with('success', 'Invoice generated successfully!');
+    }
+
+    public function sendEmail($invoice_no)
+    {
+        $invoice = Invoice::with('company')
+            ->where('invoice_no', $invoice_no)
+            ->orWhere('id', $invoice_no)
+            ->firstOrFail();
+
+        $pdf = Pdf::loadView('pdf.invoice', ['invoice' => $invoice]);
+
+        Mail::send('emails.invoice_notification', ['invoice' => $invoice], function ($message) use ($invoice, $pdf) {
+            $message->to($invoice->customer_email)
+                    ->subject('Invoice #' . $invoice->invoice_no . ' from ' . $invoice->company->name)
+                    ->attachData($pdf->output(), $invoice->invoice_no . '.pdf');
+        });
+
+        return redirect()->back()->with('success', 'Invoice sent to customer successfully!');
+    }
+
+    public function resend($id)
+    {
+        return $this->sendEmail($id);
+    }
+
+    public function downloadPdf($id_or_no)
+    {
+        $invoice = Invoice::with('company')
+            ->where('invoice_no', $id_or_no)
+            ->orWhere('id', $id_or_no)
+            ->firstOrFail();
+
+        $pdf = Pdf::loadView('pdf.invoice', ['invoice' => $invoice]);
+        return $pdf->download($invoice->invoice_no . '.pdf');
+    }
+
+    public function destroy(Invoice $invoice)
+    {
+        if ((int)$invoice->company_id !== (int)auth()->user()->company_id) {
+            abort(403, 'Unauthorized action.');
+        }
+        $invoice->delete();
+        return redirect()->route('invoice.history')->with('success', 'Invoice deleted successfully.');
+    }
+
+public function markPaid($id)
+    {
+        $invoice = Invoice::findOrFail($id);
+        $invoice->update(['status' => 'paid', 'paid_at' => now()]);
+
+        // Send Professional Receipt
+        try {
+            Mail::to($invoice->customer_email)->send(new \App\Mail\InvoicePaidMail($invoice));
+        } catch (\Exception $e) {
+            Log::error("Manual Mark Paid Email Error: " . $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Invoice marked as paid.');
+    }
+
+    /**
+     * 3. PUBLIC & PAYMENT METHODS
+     */
+
+    public function publicView($invoice_no)
+    {
+        try {
+            $invoice = Invoice::where('invoice_no', $invoice_no)->firstOrFail();
+            return view('invoice.public', compact('invoice'));
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'INVOICE LOAD FAILED'], 500);
         }
     }
 
-    // Build receipt data
-    $data = [
-        'customer_name'   => $invoice->customer_name,
-        'customer_email'  => $invoice->customer_email,
-        'street_address'  => $invoice->street_address,
-        'city_state_zip'  => $invoice->city_state_zip,
-        'invoice_date'    => $invoice->invoice_date,
-        'due_date'        => $invoice->due_date,
-        'notes'           => $invoice->notes,
-        'items'           => $invoice->items,
-        'invoice_no'      => $invoice->invoice_no,
-        'sub_total'       => $sub_total,
-        'grand_total'     => $invoice->total,
-        'is_receipt'      => true,
-        'paid_at'         => $invoice->paid_at,
-    ];
-
-    // Generate receipt PDF
-    $pdf = Pdf::loadView('pdf.invoice', $data);
-
-    // Email receipt automatically
-    Mail::send('emails.invoice', [
-        'invoice' => $invoice,
-        'is_receipt' => true
-    ], function ($message) use ($invoice, $pdf) {
-
-        $message->to($invoice->customer_email)
-            ->subject('Payment Received – Receipt #' . $invoice->invoice_no . ' | McIntosh Cleaning Services')
-            ->attachData(
-                $pdf->output(),
-                'receipt-' . $invoice->invoice_no . '.pdf',
-                ['mime' => 'application/pdf']
-            );
-    });
-
-    return redirect()
-        ->route('invoice.view', $invoice->id)
-        ->with('success', 'Invoice marked as paid and receipt sent.');
-}
-
-/* =========================
-   ADMIN DASHBOARD
-========================= */
-public function adminDashboard()
-{
-    $totalRevenue = Invoice::where('status', 'paid')->sum('total');
-
-    $thisMonthRevenue = Invoice::where('status', 'paid')
-        ->whereMonth('paid_at', now()->month)
-        ->whereYear('paid_at', now()->year)
-        ->sum('total');
-
-    $paidCount = Invoice::where('status', 'paid')->count();
-    $unpaidCount = Invoice::where('status', 'unpaid')->count();
-
-    $outstandingBalance = Invoice::where('status', 'unpaid')->sum('total');
-
-    $recentPayments = Invoice::where('status', 'paid')
-        ->orderByDesc('paid_at')
-        ->take(5)
-        ->get();
-
-    return view('invoice.dashboard', compact(
-        'totalRevenue',
-        'thisMonthRevenue',
-        'paidCount',
-        'unpaidCount',
-        'outstandingBalance',
-        'recentPayments'
-    ));
-}
-
-/* =========================
-   CUSTOMERS INDEX
-========================= */
-public function customersIndex(Request $request)
-{
-    $search = $request->query('search');
-
-    $customers = Customer::where('company_id', auth()->user()->company_id)
-        ->when($search, function ($query) use ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('company_name', 'like', "%{$search}%");
-            });
-        })
-        ->orderByDesc('created_at')
-        ->paginate(15);
-
-    return view('customers.index', compact('customers'));
-}
-
-/* =========================
-   RESEND INVOICE
-========================= */
-public function resend(Invoice $invoice)
-{
-    $sub_total = 0;
-
-    if (is_array($invoice->items)) {
-        foreach ($invoice->items as $item) {
-            $sub_total += $item['line_total'] ?? 0;
-        }
+    public function showPaymentPage($invoice_no)
+    {
+        $invoice = Invoice::with('company')->where('invoice_no', $invoice_no)->firstOrFail();
+        return view('invoice.payment', compact('invoice'));
     }
 
-    $data = [
-        'customer_name'   => $invoice->customer_name,
-        'customer_email'  => $invoice->customer_email,
-        'street_address'  => $invoice->street_address,
-        'city_state_zip'  => $invoice->city_state_zip,
-        'invoice_date'    => $invoice->invoice_date,
-        'due_date'        => $invoice->due_date,
-        'notes'           => $invoice->notes,
-        'items'           => $invoice->items,
-        'invoice_no'      => $invoice->invoice_no,
-        'sub_total'       => $sub_total,
-        'grand_total'     => $invoice->total,
-        'is_receipt'      => false,
-        'paid_at'         => $invoice->paid_at,
-    ];
-
-    $pdf = Pdf::loadView('pdf.invoice', $data);
-
-    Mail::send('emails.invoice', ['invoice' => $invoice], function ($message) use ($invoice, $pdf) {
-        $message->to($invoice->customer_email)
-            ->subject('New Invoice #' . $invoice->invoice_no . ' | McIntosh Cleaning Services')
-            ->attachData(
-                $pdf->output(),
-                'invoice-' . $invoice->invoice_no . '.pdf',
-                ['mime' => 'application/pdf']
-            );
-    });
-
-    return back()->with('success', 'Invoice resent successfully.');
-}
-
-/* =========================
-   SHOW CREATE CUSTOMER FORM
-========================= */
-public function customersCreate()
-{
-    return view('customers.create');
-}
-
-    /* =========================
-       HELPERS
-    ========================= */
-
-    private function calculateSubTotal(Invoice $invoice)
+    public function stripeCheckout($invoice_no)
     {
-        $sub_total = 0;
+        $invoice = Invoice::where('invoice_no', $invoice_no)->with('company')->firstOrFail();
+        $company = $invoice->company;
 
-        if (is_array($invoice->items)) {
-            foreach ($invoice->items as $item) {
-                $sub_total += $item['line_total'] ?? 0;
-            }
-        }
+        $stripeSecret = ($company->stripe_mode === 'live') 
+            ? $company->stripe_secret_key 
+            : $company->stripe_test_secret_key;
 
-        return $sub_total;
-    }
+        \Stripe\Stripe::setApiKey($stripeSecret ?: config('services.stripe.secret'));
 
-    private function buildSavedInvoiceData($invoice, $sub_total, $is_receipt)
-    {
-        return [
-            'customer_name'   => $invoice->customer_name,
-            'customer_email'  => $invoice->customer_email,
-            'street_address'  => $invoice->street_address,
-            'city_state_zip'  => $invoice->city_state_zip,
-            'invoice_date'    => $invoice->invoice_date,
-            'due_date'        => $invoice->due_date,
-            'notes'           => $invoice->notes,
-            'items'           => $invoice->items,
-            'invoice_no'      => $invoice->invoice_no,
-            'sub_total'       => $sub_total,
-            'grand_total'     => $invoice->total,
-            'is_receipt'      => $is_receipt,
-            'paid_at'         => $invoice->paid_at,
-        ];
-    }
-
-    private function buildInvoiceData(Request $request): array
-    {
-        $request->validate([
-            'customer_name'  => 'required|string|max:255',
-            'customer_email' => 'required|email|max:255',
-            'street_address' => 'required|string|max:255',
-            'city_state_zip' => 'required|string|max:255',
-            'invoice_date'   => 'required|date',
-            'due_date'       => 'required|date',
-            'items'          => 'required|array|min:1',
-            'items.*.desc'   => 'required|string',
-            'items.*.qty'    => 'required|integer|min:1',
-            'items.*.price'  => 'required|numeric',
+        $session = \Stripe\Checkout\Session::create([
+            'payment_method_types' => ['card'],
+            'line_items' => [[
+                'price_data' => [
+                    'currency' => 'usd',
+                    'product_data' => [
+                        'name' => "Payment for Invoice #{$invoice->invoice_no}",
+                    ],
+                    'unit_amount' => (int)($invoice->total * 100),
+                ],
+                'quantity' => 1,
+            ]],
+            'mode' => 'payment',
+            'success_url' => route('stripe.success', $invoice->invoice_no),
+            'cancel_url' => route('invoice.public_view', $invoice->invoice_no),
+            'metadata' => [
+                'invoice_no' => $invoice->invoice_no,
+                'company_id' => $company->id
+            ],
         ]);
 
-        $items = [];
-        $subTotal = 0;
+        return redirect($session->url);
+    }
 
-        foreach ($request->items as $it) {
-            $qty = (int) $it['qty'];
-            $price = (float) $it['price'];
-            $line = $qty * $price;
+    public function stripeSuccess($invoice_no)
+    {
+        $invoice = Invoice::with('company')->where('invoice_no', $invoice_no)->firstOrFail();
+        if ($invoice->status !== 'paid') {
+            $invoice->update(['status' => 'paid', 'paid_at' => now()]);
+        }
+        return view('invoice.success', compact('invoice'));
+    }
 
-            $items[] = [
-                'desc'       => $it['desc'],
-                'qty'        => $qty,
-                'price'      => $price,
-                'line_total' => $line,
-            ];
+public function submitManualPayment(Request $request, $invoice_no)
+    {
+        $invoice = Invoice::where('invoice_no', $invoice_no)->firstOrFail();
+        $invoice->update([
+            'status' => 'paid',
+            'paid_at' => now(),
+            'payment_method' => $request->payment_method
+        ]);
 
-            $subTotal += $line;
+        // Send Professional Receipt
+        try {
+            Mail::to($invoice->customer_email)->send(new \App\Mail\InvoicePaidMail($invoice));
+        } catch (\Exception $e) {
+            Log::error("Manual Payment Email Error: " . $e->getMessage());
         }
 
-        return [
-            'invoice_no'     => 'INV-' . now()->format('Ymd-His'),
-            'customer_name'  => $request->customer_name,
-            'customer_email' => $request->customer_email,
-            'street_address' => $request->street_address,
-            'city_state_zip' => $request->city_state_zip,
-            'invoice_date'   => $request->invoice_date,
-            'due_date'       => $request->due_date,
-            'items'          => $items,
-            'sub_total'      => $subTotal,
-            'grand_total'    => $subTotal,
-            'notes'          => (string) $request->notes,
-        ];
+        return redirect()->route('stripe.success', $invoice->invoice_no);
     }
 
-    private function limitNotes(string $notes, int $maxCharacters = 320): string
-    {
-        return mb_strlen($notes) > $maxCharacters
-            ? mb_substr($notes, 0, $maxCharacters) . '...'
-            : $notes;
-    }
-
-    private function emailInvoice(Invoice $invoice, $pdf): void
-    {
-        Mail::send('emails.invoice', ['invoice' => $invoice], function ($message) use ($invoice, $pdf) {
-            $message->to($invoice->customer_email)
-                ->subject('Invoice #' . $invoice->invoice_no)
-                ->attachData(
-                    $pdf->output(),
-                    'invoice-' . $invoice->invoice_no . '.pdf',
-                    ['mime' => 'application/pdf']
-                );
-        });
-    }
 }

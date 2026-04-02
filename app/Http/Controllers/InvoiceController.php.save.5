@@ -1,0 +1,210 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Invoice;
+use App\Models\Customer;
+use Illuminate\Http\Request;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Mail;
+use Carbon\Carbon;
+use Stripe\Stripe;
+use Stripe\Checkout\Session;
+
+class InvoiceController extends Controller
+{
+    public function showForm(Request $request)
+    {
+        $customers = Customer::where('company_id', auth()->user()->company_id)
+            ->orderBy('name')
+            ->get();
+
+        $selectedCustomer = null;
+
+        if ($request->filled('customer_id')) {
+            $selectedCustomer = Customer::where('company_id', auth()->user()->company_id)
+                ->find($request->customer_id);
+        }
+
+        return view('invoice.form', compact('customers', 'selectedCustomer'));
+    }
+
+    public function publicView($invoice_no)
+    {
+        $invoice = Invoice::with(['company', 'items'])
+            ->where('invoice_no', $invoice_no)
+            ->firstOrFail();
+
+        if (request()->has('success') && $invoice->status !== 'paid') {
+            $invoice->update([
+                'status' => 'paid',
+                'paid_at' => now(),
+                'payment_method' => 'card',
+            ]);
+
+            $subTotal = $this->calculateSubTotal($invoice);
+            $data = $this->buildSavedInvoiceData($invoice, $subTotal, true);
+            $pdf = Pdf::loadView('pdf.invoice', $data);
+
+            $this->emailInvoice($invoice, $pdf, true);
+        }
+
+        $company = $invoice->company;
+
+        $cleanKey = preg_replace('/\s+/', '', $company->client_stripe_key ?? '');
+        $cleanSecret = preg_replace('/\s+/', '', $company->client_stripe_secret ?? '');
+
+        $stripeEnabled = (
+            !empty($company->accept_card) &&
+            str_starts_with($cleanKey, 'pk_') &&
+            !empty($cleanSecret)
+        );
+
+        $subTotal = $this->calculateSubTotal($invoice);
+        $data = $this->buildSavedInvoiceData($invoice, $subTotal, ($invoice->status === 'paid'));
+
+        return view('invoice.public_view', array_merge($data, [
+            'invoice' => $invoice,
+            'stripeEnabled' => $stripeEnabled,
+            'stripeKey' => $cleanKey,
+        ]));
+    }
+
+    public function processPublicPayment(Request $request, $invoice_no)
+    {
+        $invoice = Invoice::with(['company', 'items'])
+            ->where('invoice_no', $invoice_no)
+            ->firstOrFail();
+
+        if ($invoice->status === 'paid') {
+            return back()->with('success', 'This invoice has already been paid.');
+        }
+
+        $company = $invoice->company;
+
+        if (!$company || !$company->accept_card) {
+            return back()->with('error', 'Online card payments are not enabled for this company.');
+        }
+
+        $secret = trim($company->client_stripe_secret ?? '');
+
+        if (!$secret) {
+            return back()->with('error', 'Online payments are currently disabled.');
+        }
+
+        Stripe::setApiKey($secret);
+
+        try {
+            $session = Session::create([
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'product_data' => [
+                            'name' => 'Invoice #' . $invoice->invoice_no,
+                            'description' => 'Payment to ' . ($company->name ?? 'Company'),
+                        ],
+                        'unit_amount' => (int) round(((float) $invoice->total) * 100),
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'payment',
+                'success_url' => route('invoice.public_view', $invoice->invoice_no) . '?success=true',
+                'cancel_url' => route('invoice.public_view', $invoice->invoice_no),
+                'customer_email' => $invoice->customer_email,
+                'metadata' => [
+                    'invoice_no' => $invoice->invoice_no,
+                    'company_id' => $invoice->company_id,
+                ],
+            ]);
+
+            return redirect($session->url);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Stripe Error: ' . $e->getMessage());
+        }
+    }
+
+    public function markPublicPayment(Request $request, $invoice_no)
+    {
+        $invoice = Invoice::with(['company', 'items'])
+            ->where('invoice_no', $invoice_no)
+            ->firstOrFail();
+
+        if ($invoice->status === 'paid') {
+            return back()->with('success', 'This invoice has already been marked as paid.');
+        }
+
+        $request->validate([
+            'payment_method' => 'required|in:check,cash,zelle,venmo',
+            'payment_reference' => 'nullable|string|max:255',
+            'check_number' => 'nullable|string|max:255',
+            'payment_notes' => 'nullable|string|max:1000',
+        ]);
+
+        if ($request->payment_method === 'check' && !$invoice->company->accept_check) {
+            return back()->with('error', 'Check payments are not enabled for this company.');
+        }
+
+        if ($request->payment_method === 'cash' && !$invoice->company->accept_cash) {
+            return back()->with('error', 'Cash payments are not enabled for this company.');
+        }
+
+        if ($request->payment_method === 'zelle' && !$invoice->company->accept_zelle) {
+            return back()->with('error', 'Zelle payments are not enabled for this company.');
+        }
+
+        if ($request->payment_method === 'venmo' && !$invoice->company->accept_venmo) {
+            return back()->with('error', 'Venmo payments are not enabled for this company.');
+        }
+
+        $invoice->update([
+            'status' => 'payment_submitted',
+            'payment_method' => $request->payment_method,
+            'payment_reference' => $request->payment_reference,
+            'check_number' => $request->check_number,
+            'payment_notes' => $request->payment_notes,
+        ]);
+
+        $companyEmail = $invoice->company->email ?: 'admin@mediosbilling.com';
+
+        $body =
+            "A customer submitted a payment notification.\n\n" .
+            "Invoice #: {$invoice->invoice_no}\n" .
+            "Customer: {$invoice->customer_name}\n" .
+            "Customer Email: {$invoice->customer_email}\n" .
+            "Amount: $" . number_format((float) $invoice->total, 2) . "\n" .
+            "Payment Method: " . strtoupper($request->payment_method) . "\n" .
+            "Reference: " . ($request->payment_reference ?: 'N/A') . "\n" .
+            "Check Number: " . ($request->check_number ?: 'N/A') . "\n" .
+            "Notes: " . ($request->payment_notes ?: 'N/A') . "\n" .
+            "Submitted At: " . now()->format('M d, Y h:i A') . "\n\n" .
+            "Please verify payment and then mark the invoice as paid from the dashboard.";
+
+        Mail::raw($body, function ($message) use ($companyEmail, $invoice) {
+            $message->to($companyEmail)
+                ->subject('Payment Submitted: ' . $invoice->invoice_no);
+        });
+
+        return redirect()
+            ->route('invoice.public_view', $invoice->invoice_no)
+            ->with('success', 'Your payment information was submitted successfully. The business will verify it shortly.');
+    }
+
+    public function history(Request $request)
+    {
+        $query = Invoice::where('company_id', auth()->user()->company_id);
+
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+
+            $query->where(function ($q) use ($search) {
+                $q->where('customer_name', 'like', '%' . $search . '%')
+                    ->orWhere('customer_email', 'like', '%' . $search . '%')
+                    ->orWhere('invoice_no', 'like', '%' . $search . '%');
+            });
+        }
+
+        $invoices = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
+
+        return view('invoice.history', compact('invoices'));
+    }

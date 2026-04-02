@@ -12,34 +12,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
 
-    ->withMiddleware(function (Middleware $middleware): void {
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->alias([
+        'check.subscription' => \App\Http\Middleware\CheckSubscription::class,
+        'superadmin' => \App\Http\Middleware\AdminMiddleware::class,
+    ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | MIDDLEWARE ALIASES
-        |--------------------------------------------------------------------------
-        | Register custom middleware aliases
-        */
-        $middleware->alias([
-            'superadmin' => \App\Http\Middleware\AdminMiddleware::class,
-        ]);
+    // 🔥 THIS IS THE FIX (disable CSRF for Stripe)
+    $middleware->validateCsrfTokens(except: [
+        'stripe/webhook',
+    ]);
+})
 
-        /*
-        |--------------------------------------------------------------------------
-        | CSRF EXCEPTIONS
-        |--------------------------------------------------------------------------
-        | Stripe cannot send CSRF tokens.
-        | We must explicitly exclude the webhook endpoint.
-        */
-        $middleware->validateCsrfTokens(
-            except: [
-                'stripe/webhook',
-            ]
-        );
-
-    })
-
-    ->withExceptions(function (Exceptions $exceptions): void {
+    ->withExceptions(function (Exceptions $exceptions) {
         //
     })
 

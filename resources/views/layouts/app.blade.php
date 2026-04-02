@@ -1,54 +1,73 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="en">
 <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medios Billing | B2B SaaS</title>
 
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="csrf-token" content="{{ csrf_token() }}">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-<title>{{ config('app.name', 'Laravel') }}</title>
+<style>
+    :root {
+        --accent-blue: #38bdf8;
+        --glass-bg: rgba(15, 23, 42, 0.8);
+        --glass-border: rgba(255, 255, 255, 0.1);
+    }
 
-<!-- Fonts -->
-<link rel="preconnect" href="https://fonts.bunny.net">
-<link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+    body {
+        background: radial-gradient(circle at top left, #1e293b, #0f172a) !important;
+        color: #f8fafc;
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+        min-height: 100vh;
+    }
 
-<!-- Scripts -->
-@vite(['resources/css/app.css', 'resources/js/app.js'])
+    .sidebar {
+        width: 260px;
+        background: rgba(15, 23, 42, 0.95);
+        backdrop-filter: blur(10px);
+        border-right: 1px solid var(--glass-border);
+        position: fixed;
+        height: 100vh;
+        z-index: 1000;
+    }
 
+    .main-content {
+        margin-left: 260px;
+        padding: 3rem;
+    }
+
+    /* RESTORE THE DASHBOARD CARDS LOOK */
+    .dashboard-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+
+    .dashboard-card:hover {
+        border-color: var(--accent-blue);
+        transform: translateY(-5px);
+    }
+
+    h2, h3, h5 { font-weight: 700; color: #fff; }
+    .text-muted { color: #94a3b8 !important; }
+
+    /* Fix table colors for dark mode */
+    .table { color: #f8fafc !important; }
+    .table-hover tbody tr:hover { background-color: rgba(255,255,255,0.05); color: #fff; }
+</style>
 </head>
-
-<body class="font-sans antialiased">
-
-<div class="min-h-screen bg-gray-100">
-
-@include('layouts.navigation')
-
-<!-- Page Heading -->
-@isset($header)
-
-<header class="bg-white shadow">
-
-<div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-
-{{ $header }}
-
-</div>
-
-</header>
-
-@endisset
-
-
-<!-- Page Content -->
-
-<main class="py-6">
-
-{{ $slot }}
-
-</main>
-
-
-</div>
-
+<body>
+    <div class="sidebar">
+        @include('layouts.sidebar')
+    </div>
+    <div class="main-content">
+        @yield('content')
+    </div>
 </body>
 </html>

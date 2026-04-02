@@ -13,8 +13,13 @@ class AdminMiddleware
             return redirect('/login');
         }
 
-        // allow access if role is superadmin
-        if (auth()->user()->role !== 'superadmin') {
+        // ✅ ALLOW if returning from impersonation
+        if (session()->has('impersonator_id')) {
+            return $next($request);
+        }
+
+        // ✅ NORMAL SUPER ADMIN CHECK
+        if (auth()->user()->role !== 'super_admin') {
             abort(403, 'Unauthorized');
         }
 

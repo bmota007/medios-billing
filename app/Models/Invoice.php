@@ -3,59 +3,59 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
-use App\Scopes\CompanyScope;
 
 class Invoice extends Model
 {
-
     protected $fillable = [
         'company_id',
         'customer_name',
         'customer_email',
+        'customer_phone',
         'street_address',
         'city_state_zip',
+        'invoice_no',
         'invoice_date',
         'due_date',
-        'items',
-        'notes',
-        'invoice_no',
+        'subtotal',
+        'discount',
+        'tax',
         'total',
+        'deposit_amount',
+        'notes',
         'status',
-        'paid_at'
+        'paid_at',
+        'payment_method',
+        'payment_reference',
+        'check_number',
+        'payment_notes',
+        'items',
     ];
 
     protected $casts = [
-        'items' => 'array',
+        'invoice_date' => 'date',
+        'due_date' => 'date',
+        'paid_at' => 'datetime',
+        'total' => 'decimal:2',
+        'subtotal' => 'decimal:2',
+        'deposit_amount' => 'decimal:2',
     ];
-
-    /*
-    |--------------------------------------------------------------------------
-    | Relationships
-    |--------------------------------------------------------------------------
-    */
 
     public function company()
     {
-        return $this->belongsTo(Company::class);
+        return $this->belongsTo(\App\Models\Company::class);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Multi-Tenant Protection
-    |--------------------------------------------------------------------------
-    */
-
-    protected static function booted()
+    public function items_relation()
     {
-        // Automatically assign company_id when creating invoices
-        static::creating(function ($invoice) {
-            if (Auth::check()) {
-                $invoice->company_id = Auth::user()->company_id;
-            }
-        });
+        return $this->hasMany(\App\Models\InvoiceItem::class, 'invoice_id', 'id');
+    }
 
-        // Global tenant scope (prevents cross-company data leaks)
-        static::addGlobalScope(new CompanyScope);
+    /**
+     * This helper ensures that if we have JSON items in the column, 
+     * they are decoded properly for the view loops.
+     */
+    public function getDecodedItemsAttribute()
+    {
+        return json_decode($this->items, true) ?? [];
     }
 }

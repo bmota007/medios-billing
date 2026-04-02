@@ -3,26 +3,45 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Scopes\CompanyScope;
 
 class Customer extends Model
 {
     protected $fillable = [
         'company_id',
-        'customer_type',
         'name',
+        'company_name',
         'email',
         'phone',
-        'company_name',
         'billing_address',
+        'street_address',
         'city',
         'state',
         'zip',
-        'notes',
+        'city_state_zip',
+        'slug',
     ];
 
-    protected static function booted()
+    /**
+     * Relationship to the Company (Multi-tenancy)
+     */
+    public function company()
     {
-        static::addGlobalScope(new CompanyScope);
+        return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * Relationship to Invoices
+     */
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    /**
+     * Relationship to Quotes
+     */
+    public function quotes()
+    {
+        return $this->hasMany(Quote::class);
     }
 }

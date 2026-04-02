@@ -3,150 +3,174 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
-use App\Models\User;
 use App\Models\Invoice;
-use App\Scopes\CompanyScope;
+use App\Models\User;
+use App\Models\SubscriptionInvoice;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AdminController extends Controller
 {
     public function dashboard()
     {
-        $companies = Company::count();
+        $stats = [
+            'total_companies'      => Company::count(),
+            'active_companies'     => Company::where('subscription_status', 'active')->count(),
+            'inactive_companies'   => Company::where('subscription_status', 'inactive')->count(),
+            'total_invoices'       => Invoice::count(),
+            'total_revenue'        => Invoice::where('status', 'paid')->sum('total'),
+            'subscription_revenue' => SubscriptionInvoice::where('status', 'paid')->sum('amount'),
+            'recent_invoices'      => Invoice::with('company')->latest()->take(10)->get(),
+            'recent_subscriptions'=> SubscriptionInvoice::with('company')->latest()->take(10)->get(),
+        ];
 
-        $users = User::count();
+        return view('admin.dashboard', compact('stats'));
+    }
 
-        // IMPORTANT: Admin must bypass tenant scope
-        $invoices = Invoice::withoutGlobalScope(CompanyScope::class)->count();
+    public function companies(Request $request)
+    {
+        $query = Company::query();
 
-        $paidInvoices = Invoice::withoutGlobalScope(CompanyScope::class)
-            ->where('status', 'paid')
-            ->count();
+        if ($request->filled('search')) {
+            $query->where('name', 'like', '%' . $request->search . '%');
+        }
 
-        $pendingInvoices = Invoice::withoutGlobalScope(CompanyScope::class)
-            ->where('status', 'pending')
-            ->count();
+        if ($request->filled('status')) {
+            $query->where('subscription_status', strtolower($request->status));
+        }
 
-        $overdueInvoices = Invoice::withoutGlobalScope(CompanyScope::class)
-            ->where('status', 'overdue')
-            ->count();
+        $companies = $query->withCount(['users', 'invoices'])
+                           ->latest()
+                           ->paginate(9)
+                           ->withQueryString();
 
-        $cancelledInvoices = Invoice::withoutGlobalScope(CompanyScope::class)
-            ->where('status', 'cancelled')
-            ->count();
+        return view('admin.companies.index', compact('companies'));
+    }
 
-        $revenue = Invoice::withoutGlobalScope(CompanyScope::class)
-            ->where('status', 'paid')
-            ->sum('total');
+    public function toggleStatus($id)
+    {
+        $company = Company::findOrFail($id);
+        $isActiveNow = ($company->subscription_status === 'active');
 
-        $recentInvoices = Invoice::withoutGlobalScope(CompanyScope::class)
-            ->latest()
-            ->take(5)
-            ->get();
+        $company->subscription_status = $isActiveNow ? 'inactive' : 'active';
+        $company->is_active = !$isActiveNow;
 
-        /*
-        |--------------------------------------------------------------------------
-        | SaaS Metrics
-        |--------------------------------------------------------------------------
-        */
+        if (!$isActiveNow) {
+            $company->subscription_ends_at = now()->addMonth();
+        }
 
-        $mrr = Invoice::withoutGlobalScope(CompanyScope::class)
-            ->where('status', 'paid')
-            ->whereMonth('created_at', now()->month)
-            ->sum('total');
+        $company->save();
 
-        $arr = $mrr * 12;
+        return back()->with('success', 'Status updated for ' . $company->name);
+    }
 
-        $invoicesThisMonth = Invoice::withoutGlobalScope(CompanyScope::class)
-            ->whereMonth('created_at', now()->month)
-            ->count();
+    public function destroyCompany($id)
+    {
+        $company = Company::findOrFail($id);
+        $company->delete();
+        return back()->with('success', 'Company deleted successfully.');
+    }
 
-        $activeCompanies = Company::count();
+    public function createCompany()
+    {
+        return view('admin.companies.create');
+    }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Revenue Trend (Last 12 Months)
-        |--------------------------------------------------------------------------
-        */
-
-        $revenueTrend = Invoice::withoutGlobalScope(CompanyScope::class)
-            ->where('status', 'paid')
-            ->selectRaw('MONTH(created_at) as month, SUM(total) as total')
-            ->groupBy('month')
-            ->pluck('total', 'month');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Top Companies by Revenue
-        |--------------------------------------------------------------------------
-        */
-
-        $topCompanies = Company::select('companies.id', 'companies.name')
-            ->join('invoices', 'companies.id', '=', 'invoices.company_id')
-            ->where('invoices.status', 'paid')
-            ->selectRaw('SUM(invoices.total) as revenue, COUNT(invoices.id) as invoices_count')
-            ->groupBy('companies.id', 'companies.name')
-            ->orderByDesc('revenue')
-            ->limit(5)
-            ->get();
-
-        return view('admin.dashboard', [
-            'companies' => $companies,
-            'users' => $users,
-            'invoices' => $invoices,
-            'paidInvoices' => $paidInvoices,
-            'pendingInvoices' => $pendingInvoices,
-            'overdueInvoices' => $overdueInvoices,
-            'cancelledInvoices' => $cancelledInvoices,
-            'revenue' => $revenue,
-            'recentInvoices' => $recentInvoices,
-
-            // SaaS Metrics
-            'mrr' => $mrr,
-            'arr' => $arr,
-            'invoicesThisMonth' => $invoicesThisMonth,
-            'activeCompanies' => $activeCompanies,
-
-            // Chart Data
-            'revenueTrend' => $revenueTrend,
-
-            // Leaderboard
-            'topCompanies' => $topCompanies,
+    public function storeCompany(Request $request)
+    {
+        $validated = $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:companies,email',
+            'phone'    => 'nullable|string',
+            'plan'     => 'required|string',
+            'mrr'      => 'nullable|numeric',
+            'industry' => 'nullable|string',
         ]);
+
+        $company = Company::create($validated);
+
+        User::create([
+            'name'       => $company->name . ' Admin',
+            'email'      => 'admin@' . strtolower(str_replace(' ', '', $company->name)) . '.com',
+            'password'   => bcrypt('password123'),
+            'company_id' => $company->id,
+            'role'       => 'admin',
+        ]);
+
+        return redirect()->route('admin.companies')->with('success', 'Company + Admin user created.');
     }
 
-    public function companies()
+    public function billing()
     {
-        $companies = Company::with('users')
-            ->withCount(['users', 'invoices'])
-            ->latest()
-            ->paginate(20);
+        $stats = [
+            'mrr'                  => SubscriptionInvoice::where('status', 'paid')->sum('amount'),
+            'paid_subscriptions'   => SubscriptionInvoice::where('status', 'paid')->count(),
+            'failed_subscriptions' => SubscriptionInvoice::where('status', 'failed')->count(),
+            'active_companies'     => Company::where('subscription_status', 'active')->count(),
+            'inactive_companies'   => Company::where('subscription_status', 'inactive')->count(),
+        ];
 
-        return view('admin.companies', compact('companies'));
+        $subscriptionInvoices = SubscriptionInvoice::with('company')->latest()->paginate(20);
+
+        return view('admin.billing', compact('stats', 'subscriptionInvoices'));
     }
 
-    public function company($id)
+    public function brand()
     {
-        $company = Company::with(['users', 'invoices'])->findOrFail($id);
+        $user = auth()->user();
+        return view('admin.brand', compact('user'));
+    }
 
-        // Total invoices for this company
-        $invoiceCount = $company->invoices()->count();
+    public function updateBrand(Request $request)
+    {
+        $user = auth()->user();
 
-        // Total revenue from paid invoices
-        $invoiceTotal = $company->invoices()
-            ->where('status', 'paid')
-            ->sum('total');
+        if ($request->hasFile('logo')) {
+            $path = $request->file('logo')->store('logos', 'public');
+            $user->logo = $path;
+        }
 
-        // Latest invoices
-        $recentInvoices = $company->invoices()
-            ->orderBy('created_at', 'desc')
-            ->limit(5)
-            ->get();
+        if ($request->filled('name')) {
+            $user->name = $request->name;
+        }
 
-        return view('admin.company', compact(
-            'company',
-            'invoiceCount',
-            'invoiceTotal',
-            'recentInvoices'
-        ));
+        if ($request->filled('password')) {
+            $request->validate(['password' => 'confirmed|min:6']);
+            $user->password = bcrypt($request->password);
+        }
+
+        $user->save();
+        return back()->with('success', 'Platform updated successfully');
+    }
+
+    public function loginAsCompany($id)
+    {
+        $company = Company::findOrFail($id);
+        $user = User::where('company_id', $company->id)->first();
+
+        if (!$user) {
+            return back()->with('error', 'No users found for this company.');
+        }
+
+        session(['impersonator_id' => auth()->id()]);
+        auth()->login($user);
+        request()->session()->regenerate();
+
+        return redirect('/dashboard')->with('success', 'Now viewing: ' . $company->name);
+    }
+
+    public function stopImpersonating()
+    {
+        $adminId = session('impersonator_id');
+        if ($adminId) {
+            $admin = User::find($adminId);
+            if ($admin) {
+                Auth::login($admin);
+                session()->forget('impersonator_id');
+                session()->regenerate();
+                return redirect()->route('admin.dashboard')->with('success', 'Returned to admin.');
+            }
+        }
+        return redirect('/');
     }
 }

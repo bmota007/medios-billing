@@ -2,99 +2,57 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login | McIntosh Cleaning Service</title>
+    <title>Login | Medios Billing</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
+
 <body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
 
 <div class="w-full max-w-md bg-[#020c1b] rounded-2xl shadow-xl p-8 text-white">
 
-    <!-- LOGO -->
-    <div class="flex justify-center mb-6">
-        <img
-            src="{{ asset('images/mcintosh-logo.png') }}"
-            alt="McIntosh Cleaning Service"
-            class="h-24 object-contain"
-        >
-    </div>
+<!-- 🔥 LOGO FIX -->
+<div class="text-center mb-8">
+    @php
+        $company = session('company') ?? null;
+    @endphp
 
-    <h2 class="text-2xl text-center mb-6">Log in</h2>
-
-    {{-- Validation Errors --}}
-    @if ($errors->any())
-        <div class="mb-4 text-sm text-red-400 text-center">
-            {{ $errors->first() }}
-        </div>
+    @if($company && $company->logo_path)
+        <img src="{{ asset('storage/' . $company->logo_path) }}"
+             alt="Logo"
+             style="height:60px; margin:auto;">
+    @else
+        <h2 class="text-white font-bold text-2xl">
+            Medios<span class="text-sky-400">Billing</span>
+        </h2>
     @endif
 
-    <form method="POST" action="{{ route('login') }}">
-        @csrf
-
-        <div class="mb-4">
-            <input
-                type="email"
-                name="email"
-                placeholder="Email"
-                value="{{ old('email') }}"
-                required
-                autofocus
-                class="w-full px-4 py-2 rounded-full bg-slate-800 border border-slate-600 focus:outline-none focus:ring focus:ring-blue-500"
-            >
-        </div>
-
-        <div class="mb-4">
-            <input
-                type="password"
-                name="password"
-                placeholder="Password"
-                required
-                class="w-full px-4 py-2 rounded-full bg-slate-800 border border-slate-600 focus:outline-none focus:ring focus:ring-blue-500"
-            >
-        </div>
-
-        <div class="flex justify-between items-center text-sm mb-4">
-            <label class="flex items-center gap-2">
-                <input type="checkbox" name="remember">
-                Remember me
-            </label>
-
-            @if (Route::has('password.request'))
-                <a href="{{ route('password.request') }}" class="text-blue-400 hover:underline">
-                    Forgot password?
-                </a>
-            @endif
-        </div>
-
-        <button
-            type="submit"
-            class="w-full py-2 rounded-full bg-blue-600 hover:bg-blue-700 transition font-semibold"
-        >
-            Log in
-        </button>
-    </form>
-
-    <div class="text-center text-sm mt-6">
-        or
-        <a href="{{ route('register') }}" class="text-blue-400 hover:underline">
-            Sign up
-        </a>
-    </div>
-
-    <!-- POWERED BY -->
-    <div class="text-center text-xs text-gray-400 mt-6">
-        Powered by
-        <a
-            href="https://medioscorporativos.com/"
-            target="_blank"
-            class="text-blue-400 hover:underline"
-        >
-            MediosCorporativos
-        </a>
-    </div>
-
+    <p class="text-slate-500 text-xs mt-2 uppercase tracking-widest">
+        Secure Client Portal
+    </p>
 </div>
 
+<h2 class="text-white text-lg font-medium text-center mb-6">Account Login</h2>
+
+@if ($errors->any())
+<div class="mb-4 text-sm text-red-400 text-center">
+    {{ $errors->first() }}
+</div>
+@endif
+
+<form method="POST" action="{{ route('login') }}">
+    @csrf
+
+    <input type="email" name="email" placeholder="Email" required class="w-full mb-3 px-4 py-2 rounded-full bg-slate-800">
+    <input type="password" name="password" placeholder="Password" required class="w-full mb-4 px-4 py-2 rounded-full bg-slate-800">
+
+    <button type="submit" class="w-full py-2 bg-blue-600 rounded-full">
+        Log in
+    </button>
+</form>
+
+</div>
 </body>
 </html>
+

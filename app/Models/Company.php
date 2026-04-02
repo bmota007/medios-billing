@@ -3,42 +3,89 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Company extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
+        // BASIC INFO
         'name',
         'email',
+        'logo_path',
         'logo',
+        'primary_color',
         'phone',
         'address',
+        'website',
         'domain',
-        'subdomain'
+        'subdomain',
+        'street_address',
+        'city_state_zip',
+
+        // SUBSCRIPTION & STATUS
+        'plan_name',
+        'monthly_price',
+        'subscription_status',
+        'subscription_started_at',
+        'subscription_ends_at',
+        'is_active',
+        'trial_ends_at',
+        'stripe_id',
+        'is_vetted',
+        'status',
+        'last_login_at',
+        'plan',
+        'mrr',
+        'industry',
+
+        // STRIPE INTEGRATION (Synced with Controller & Settings)
+        'stripe_mode',
+        'stripe_publishable_key',
+        'stripe_secret_key',
+        'stripe_test_publishable_key', // Added this to match DB
+        'stripe_test_secret_key',
+        'stripe_webhook_secret',
+        'stripe_test_public_key',
+        'stripe_test_webhook_secret',
+
+        // LEGACY STRIPE FIELDS
+        'client_stripe_key',
+        'client_stripe_secret',
+        'client_stripe_webhook_secret',
+
+        // CONTRACT FIELDS
+        'contract_template_path',
+        'contract_template_type',
+
+        // PAYMENT METHODS & TOGGLES
+        'accept_card',
+        'accept_check',
+        'accept_cash',
+        'accept_zelle',
+        'accept_venmo',
+        'zelle_label',
+        'zelle_value',
+        'venmo_label',
+        'venmo_value',
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | Relationships
-    |--------------------------------------------------------------------------
-    */
+    protected $casts = [
+        'subscription_started_at' => 'datetime',
+        'subscription_ends_at' => 'datetime',
+        'trial_ends_at' => 'datetime',
+        'monthly_price' => 'decimal:2',
+        'is_active' => 'boolean',
+        'is_vetted' => 'boolean',
+        'accept_card' => 'boolean',
+        'accept_check' => 'boolean',
+        'accept_cash' => 'boolean',
+        'accept_zelle' => 'boolean',
+        'accept_venmo' => 'boolean',
+        
+        // Removed 'encrypted' cast for now to ensure the Webhook can read the string directly
+    ];
 
-    /**
-     * Company Users
-     */
-    public function users()
-    {
-        return $this->hasMany(User::class, 'company_id');
-    }
-
-    /**
-     * Company Invoices
-     */
-    public function invoices()
-    {
-        return $this->hasMany(Invoice::class, 'company_id');
-    }
-
+    public function users() { return $this->hasMany(User::class); }
+    public function invoices() { return $this->hasMany(Invoice::class); }
+    public function customers() { return $this->hasMany(Customer::class); }
+    public function quotes() { return $this->hasMany(Quote::class); }
 }
