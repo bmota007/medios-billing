@@ -26,15 +26,26 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
+        
+        // Fill the model with validated data
+        $user->fill($request->validated());
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
         }
 
-        $request->user()->save();
+        /*
+        |--------------------------------------------------------------------------
+        | 🔓 THE KEY: This breaks the profile loop forever.
+        |--------------------------------------------------------------------------
+        */
+        $user->needs_password_change = false;
+        
+        $user->save();
 
-        return Redirect::route('profile.edit')->with('status', 'profile-updated');
+        // REDIRECT: Go to the REAL dashboard stats, NOT the settings page.
+        return Redirect::to('/dashboard')->with('success', 'Profile updated. Handshake complete!');
     }
 
     /**

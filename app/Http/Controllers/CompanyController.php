@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\View;
 
 class CompanyController extends Controller
 {
@@ -36,7 +35,7 @@ class CompanyController extends Controller
             abort(404, 'Business profile not found.');
         }
 
-        return view('companies.settings', compact('company'));
+        return view('company.settings', compact('company'));
     }
 
     /**
@@ -47,7 +46,7 @@ class CompanyController extends Controller
         $user = Auth::user();
 
         try {
-            // 1. HARD TARGET: If we are on the admin branding path, we MUST use ID 1
+            // 1. Target correct company (ID 1 for Admin paths, otherwise User's company)
             if (request()->routeIs('admin.brand.update') || request()->is('admin/brand*')) {
                 $company = Company::find(1);
             } else {
@@ -55,10 +54,10 @@ class CompanyController extends Controller
             }
 
             if (!$company) {
-                return back()->with('error', 'Update failed: Company record not found in database.');
+                return back()->with('error', 'Update failed: Company record not found.');
             }
 
-            // 2. Map Basic Info & Payment Toggles (All original logic preserved)
+            // 2. Map Basic Info & Payment Toggles
             $company->name = $request->name;
             $company->email = $request->email;
             $company->phone = $request->phone;
@@ -77,7 +76,7 @@ class CompanyController extends Controller
             $company->venmo_label = $request->venmo_label ?? 'Venmo';
             $company->venmo_value = $request->venmo_value;
 
-            // 3. Stripe Keys (Kitchen logic intact)
+            // 3. Stripe Keys (Webhook Secret Included)
             $company->stripe_mode = $request->stripe_mode ?? 'test';
             $company->stripe_test_publishable_key = $request->stripe_test_publishable_key;
             $company->stripe_test_secret_key = $request->stripe_test_secret_key;
@@ -85,12 +84,11 @@ class CompanyController extends Controller
             $company->stripe_secret_key = $request->stripe_secret_key;
             $company->stripe_webhook_secret = $request->stripe_webhook_secret;
 
-            // 4. THE LOGO FIX: Explicitly saving to both columns
+            // 4. Logo Handling (Cleanup and dual-column update)
             if ($request->hasFile('logo')) {
                 $file = $request->file('logo');
                 
-                // Cleanup old file from disk
-                $oldPath = $company->logo ?? $company->logo_path;
+                $oldPath = $company->logo_path;
                 if ($oldPath && Storage::disk('public')->exists($oldPath)) {
                     Storage::disk('public')->delete($oldPath);
                 }
@@ -100,11 +98,9 @@ class CompanyController extends Controller
                 
                 $company->logo = $path;
                 $company->logo_path = $path;
-                
-                Log::info("Logo saved for Company ID {$company->id}: " . $path);
             }
 
-            // 5. Handle Contract
+            // 5. Contract Handling
             if ($request->hasFile('contract_template')) {
                 $file = $request->file('contract_template');
                 $path = $file->storeAs('contracts', 'Contract_'.time().'.'.$file->getClientOriginalExtension(), 'public');
@@ -112,17 +108,20 @@ class CompanyController extends Controller
                 $company->contract_template_type = $file->getClientOriginalExtension();
             }
 
-            // 6. SAVE AND VERIFY
+            // 6. Save Company Record
             if (!$company->save()) {
                 throw new \Exception("Database failed to save the company record.");
             }
 
-            // 7. Handle Password
-            if ($request->filled('new_password')) {
-                $user->update(['password' => Hash::make($request->new_password)]);
+            // 7. Password Update (Matches Blade 'password' input name)
+            if ($request->filled('password')) {
+                $request->validate([
+                    'password' => 'required|min:8|confirmed',
+                ]);
+                $user->update(['password' => Hash::make($request->password)]);
             }
 
-            return back()->with('success', 'Branding and Settings updated successfully!');
+            return back()->with('success', 'Settings updated successfully!');
 
         } catch (\Exception $e) {
             Log::error("Critical Update Error: " . $e->getMessage());

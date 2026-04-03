@@ -1,120 +1,91 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('content')
-<div class="container-fluid py-4">
+<div class="container-fluid">
     <div class="mb-4">
-        <h1 class="fw-bold text-white mb-1">SaaS Billing</h1>
-        <p class="text-light opacity-75 mb-0">Platform subscription revenue, renewals, failed payments, and active accounts.</p>
+        <h2 class="text-white fw-bold">Platform <span class="accent-text">Billing</span></h2>
+        <p class="text-secondary small">Subscription revenue, renewals, and platform health.</p>
     </div>
 
-    <div class="row g-4 mb-4">
-        <div class="col-md-6 col-xl-3">
-            <div class="card border-0 shadow-lg h-100" style="background: rgba(255,255,255,0.06); backdrop-filter: blur(10px); border-radius: 18px;">
-                <div class="card-body">
-                    <div class="text-uppercase small text-light opacity-75 mb-2">Monthly Recurring Revenue</div>
-                    <div class="fs-2 fw-bold text-white">${{ number_format($stats['mrr'] ?? 0, 2) }}</div>
-                </div>
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <div class="dashboard-card h-100 border-start border-info border-4">
+                <div class="text-white-50 small uppercase fw-bold mb-2">Total MRR</div>
+                <h2 class="text-white fw-bold">${{ number_format($stats['mrr'] ?? 0, 2) }}</h2>
             </div>
         </div>
-
-        <div class="col-md-6 col-xl-3">
-            <div class="card border-0 shadow-lg h-100" style="background: rgba(255,255,255,0.06); backdrop-filter: blur(10px); border-radius: 18px;">
-                <div class="card-body">
-                    <div class="text-uppercase small text-light opacity-75 mb-2">Paid Invoices</div>
-                    <div class="fs-2 fw-bold text-success">{{ $stats['paid_subscriptions'] ?? 0 }}</div>
-                </div>
+        <div class="col-md-3">
+            <div class="dashboard-card h-100 border-start border-success border-4">
+                <div class="text-white-50 small uppercase fw-bold mb-2">Paid Subs</div>
+                <h2 class="text-white fw-bold">{{ $stats['paid_subscriptions'] ?? 0 }}</h2>
             </div>
         </div>
-
-        <div class="col-md-6 col-xl-3">
-            <div class="card border-0 shadow-lg h-100" style="background: rgba(255,255,255,0.06); backdrop-filter: blur(10px); border-radius: 18px;">
-                <div class="card-body">
-                    <div class="text-uppercase small text-light opacity-75 mb-2">Failed Payments</div>
-                    <div class="fs-2 fw-bold text-danger">{{ $stats['failed_subscriptions'] ?? 0 }}</div>
-                </div>
+        <div class="col-md-3">
+            <div class="dashboard-card h-100 border-start border-warning border-4">
+                <div class="text-white-50 small uppercase fw-bold mb-2">Active Tenants</div>
+                <h2 class="text-white fw-bold">{{ $stats['active_companies'] ?? 0 }}</h2>
             </div>
         </div>
-
-        <div class="col-md-6 col-xl-3">
-            <div class="card border-0 shadow-lg h-100" style="background: rgba(255,255,255,0.06); backdrop-filter: blur(10px); border-radius: 18px;">
-                <div class="card-body">
-                    <div class="text-uppercase small text-light opacity-75 mb-2">Active Companies</div>
-                    <div class="fs-2 fw-bold text-info">{{ $stats['active_companies'] ?? 0 }}</div>
-                    <div class="small text-light opacity-75 mt-2">Inactive: {{ $stats['inactive_companies'] ?? 0 }}</div>
-                </div>
+        <div class="col-md-3">
+            <div class="dashboard-card h-100 border-start border-danger border-4">
+                <div class="text-white-50 small uppercase fw-bold mb-2">Failed</div>
+                <h2 class="text-white fw-bold">{{ $stats['failed_subscriptions'] ?? 0 }}</h2>
             </div>
         </div>
     </div>
 
-    <div class="card border-0 shadow-lg" style="background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border-radius: 20px; overflow: hidden;">
-        <div class="card-header border-0 py-3 px-4" style="background: rgba(255,255,255,0.04);">
-            <h2 class="h5 text-white mb-0">Subscription Invoices</h2>
+    <div class="glass-card">
+        <h5 class="text-white mb-4">Subscription History</h5>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead class="text-secondary small uppercase">
+                    <tr style="background: rgba(255,255,255,0.02);">
+                        <th class="ps-4">Company</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Interval</th>
+                        <th class="text-end pe-4">Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($subscriptionInvoices as $invoice)
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05)">
+                        <td class="ps-4">
+                            <div class="fw-bold text-white">{{ $invoice->company->name ?? 'Unknown' }}</div>
+                            <div class="small text-secondary">{{ $invoice->company->email ?? '' }}</div>
+                        </td>
+                        <td class="fw-bold text-info">${{ number_format($invoice->amount, 2) }}</td>
+                        <td>
+                            <span class="badge {{ $invoice->status === 'paid' ? 'bg-success' : 'bg-danger' }} px-3 text-uppercase" style="font-size: 10px;">
+                                {{ $invoice->status }}
+                            </span>
+                        </td>
+                        <td class="text-secondary small uppercase">{{ $invoice->interval ?? 'Month' }}</td>
+                        <td class="text-end text-secondary small pe-4">{{ $invoice->created_at->format('M d, Y') }}</td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-secondary">No invoices found.</td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
-
-        <div class="card-body p-0">
-            @if(isset($subscriptionInvoices) && $subscriptionInvoices->count())
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead>
-                            <tr style="background: rgba(255,255,255,0.04);">
-                                <th class="text-light px-4 py-3 border-0">Invoice #</th>
-                                <th class="text-light px-3 py-3 border-0">Company</th>
-                                <th class="text-light px-3 py-3 border-0">Email</th>
-                                <th class="text-light px-3 py-3 border-0">Amount</th>
-                                <th class="text-light px-3 py-3 border-0">Status</th>
-                                <th class="text-light px-3 py-3 border-0">Period</th>
-                                <th class="text-light px-3 py-3 border-0">Paid</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($subscriptionInvoices as $invoice)
-                                <tr style="border-top: 1px solid rgba(255,255,255,0.06);">
-                                    <td class="text-white fw-semibold px-4 py-3">{{ $invoice->invoice_no }}</td>
-                                    <td class="text-light px-3 py-3">{{ $invoice->customer_name ?? optional($invoice->company)->name ?? 'N/A' }}</td>
-                                    <td class="text-light px-3 py-3">{{ $invoice->customer_email ?? 'N/A' }}</td>
-                                    <td class="text-white px-3 py-3">${{ number_format((float) $invoice->amount, 2) }}</td>
-                                    <td class="px-3 py-3">
-                                        @if($invoice->status === 'paid')
-                                            <span class="badge rounded-pill bg-success">Paid</span>
-                                        @elseif($invoice->status === 'failed')
-                                            <span class="badge rounded-pill bg-danger">Failed</span>
-                                        @else
-                                            <span class="badge rounded-pill bg-secondary">{{ ucfirst($invoice->status) }}</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-light px-3 py-3">
-                                        <small>
-                                            {{ optional($invoice->period_start)->format('M d, Y') ?? '—' }}
-                                            —
-                                            {{ optional($invoice->period_end)->format('M d, Y') ?? '—' }}
-                                        </small>
-                                    </td>
-                                    <td class="text-light px-3 py-3">
-                                        <small>{{ optional($invoice->paid_at)->format('M d, Y g:i A') ?? '—' }}</small>
-                                    </td>
-                                </tr>
-
-                                @if(!empty($invoice->notes))
-                                    <tr>
-                                        <td colspan="7" class="px-4 pb-3 pt-0 text-light">
-                                            <small class="opacity-75"><strong>Notes:</strong> {{ $invoice->notes }}</small>
-                                        </td>
-                                    </tr>
-                                @endif
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="p-4">
-                    {{ $subscriptionInvoices->links() }}
-                </div>
-            @else
-                <div class="p-4 text-light opacity-75">
-                    No subscription invoices found yet.
-                </div>
-            @endif
+        <div class="mt-4">
+            {{ $subscriptionInvoices->links() }}
         </div>
     </div>
 </div>
+
+<style>
+    .accent-text { color: #38bdf8; }
+    .uppercase { text-transform: uppercase; letter-spacing: 1px; }
+    .dashboard-card { 
+        background: rgba(30, 41, 59, 0.6); 
+        backdrop-filter: blur(12px); 
+        border: 1px solid rgba(255, 255, 255, 0.1); 
+        border-radius: 1rem; 
+        padding: 1.5rem; 
+    }
+</style>
 @endsection

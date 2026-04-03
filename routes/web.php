@@ -14,6 +14,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\StripeWebhookController;
+use App\Http\Controllers\Billing\CheckoutController;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,6 +32,8 @@ Route::get('/', function () {
 
 Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
 Route::post('/register', [RegisterController::class, 'register']);
+Route::get('/onboarding/setup/{token}', [RegisterController::class, 'showSetupForm'])->name('onboarding.setup');
+Route::post('/onboarding/complete', [RegisterController::class, 'completeSetup'])->name('onboarding.complete');
 
 /*
 |--------------------------------------------------------------------------
@@ -86,6 +89,7 @@ Route::middleware('auth')->group(function () {
 
 Route::get('/billing/expired', [BillingController::class, 'expired'])->name('billing.expired');
 Route::get('/billing-locked', function () { return view('billing.locked'); })->name('billing.locked');
+Route::get('/subscribe/{companyId}', [CheckoutController::class, 'subscribe'])->name('billing.subscribe');
 
 /*
 |--------------------------------------------------------------------------
@@ -95,6 +99,7 @@ Route::get('/billing-locked', function () { return view('billing.locked'); })->n
 Route::middleware(['auth', 'check.subscription'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/onboarding/accept', [DashboardController::class, 'acceptLegal'])->name('legal.accept');
 
     // Customers
     Route::resource('customers', CustomerController::class);
@@ -105,38 +110,29 @@ Route::middleware(['auth', 'check.subscription'])->group(function () {
     Route::get('/quotes/{quote}/download', [QuoteController::class, 'downloadPdf'])->name('quotes.download');
     Route::post('/quotes/{quote}/send', [QuoteController::class, 'send'])->name('quotes.send');
     Route::post('/quotes/{quote}/convert', [QuoteController::class, 'convertToInvoice'])->name('quotes.convert');
+    Route::post('/team/{id}/reset', [UserController::class, 'resetPassword'])->name('users.reset');
 
-    /*
-    |--------------------------------------------------------------------------
-    | INVOICES MANAGEMENT (CLEANED & FIXED)
-    |--------------------------------------------------------------------------
-    */
+    // Invoices
     Route::get('/invoices', [InvoiceController::class, 'history'])->name('invoice.history');
     Route::get('/invoice/create', [InvoiceController::class, 'showForm'])->name('invoice.create');
     Route::post('/invoice/send', [InvoiceController::class, 'send'])->name('invoice.send');
-    
-    // Management Routes
     Route::get('/invoice/edit/{invoice}', [InvoiceController::class, 'edit'])->name('invoice.edit');
     Route::put('/invoice/update/{invoice}', [InvoiceController::class, 'update'])->name('invoice.update');
-
     Route::post('/invoice/{invoice}/resend', [InvoiceController::class, 'resend'])->name('invoice.resend');
     Route::post('/invoice/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])->name('invoice.markPaid');
     Route::post('/invoice/send-email/{invoice_no}', [InvoiceController::class, 'sendEmail'])->name('invoice.send_email');
-
     Route::get('/invoice/{invoice}/download', [InvoiceController::class, 'downloadPdf'])->name('invoice.download');
     Route::delete('/invoice/{invoice}', [InvoiceController::class, 'destroy'])->name('invoice.destroy');
-
-    // Internal View
     Route::get('/invoice/internal/{invoice}', [InvoiceController::class, 'view'])->name('invoice.view');
 
     // Settings
     Route::get('/company/settings', [CompanyController::class, 'settings'])->name('company.settings');
     Route::post('/company/settings', [CompanyController::class, 'update'])->name('company.update');
 
-    // Users
-    Route::get('/company/users', [UserController::class, 'index'])->name('company.users');
-    Route::get('/company/users/create', [UserController::class, 'create'])->name('company.users.create');
-    Route::post('/company/users/store', [UserController::class, 'store'])->name('company.users.store');
+    // Team
+    Route::get('/team', [UserController::class, 'index'])->name('users.index');
+    Route::post('/team', [UserController::class, 'store'])->name('users.store');
+    Route::delete('/team/{id}', [UserController::class, 'destroy'])->name('users.destroy');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -150,14 +146,17 @@ Route::middleware(['auth', 'check.subscription'])->group(function () {
 */
 Route::middleware(['auth', 'superadmin'])->prefix('admin')->group(function () {
     
-    // ✅ FIX: Redirect root /admin to the dashboard to prevent 404
     Route::get('/', function () { 
         return redirect()->route('admin.dashboard'); 
     });
 
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+    Route::post('/manual-charge', [AdminController::class, 'manualCharge'])->name('admin.manual-charge');
     
-    // ✅ Restored the missing destroy route that was showing in your error logs
+    // NEW: Onboarding Logic
+    Route::get('/manual-charge', [AdminController::class, 'manualChargeCreate'])->name('admin.manual-charge.create');
+    Route::post('/manual-charge/store', [AdminController::class, 'storeManualCharge'])->name('admin.manual-charge.store');
+    
     Route::delete('/companies/{id}', [AdminController::class, 'destroyCompany'])->name('admin.companies.destroy');
     
     Route::get('/brand', [CompanyController::class, 'settings'])->name('admin.brand');

@@ -2,11 +2,9 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use App\Models\Company;
 
 class User extends Authenticatable
 {
@@ -14,20 +12,21 @@ class User extends Authenticatable
 
     /**
      * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
      */
     protected $fillable = [
         'name',
         'email',
         'password',
         'company_id',
+        'role',
+        'is_admin',
+        'logo',
+        'legal_accepted_at',
+        'needs_password_change', // Added this
     ];
 
     /**
      * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
      */
     protected $hidden = [
         'password',
@@ -37,20 +36,16 @@ class User extends Authenticatable
     /**
      * The attributes that should be cast.
      */
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
-    }
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'is_admin' => 'boolean',
+        'legal_accepted_at' => 'datetime',
+        'needs_password_change' => 'boolean', // Added this
+    ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | Relationships
-    |--------------------------------------------------------------------------
-    */
-
+    /**
+     * Relationship: User belongs to a Company
+     */
     public function company()
     {
         return $this->belongsTo(Company::class);

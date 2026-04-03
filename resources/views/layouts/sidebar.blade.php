@@ -6,10 +6,8 @@
 
     // 1. Identify context
     if (session()->has('impersonator_id')) {
-        // If impersonating, show the client's logo
         $currentCompany = auth()->user()->company;
     } elseif (auth()->check()) {
-        // If Super Admin, look for the 'Medios Billing' company record
         if (auth()->user()->role === 'super_admin' || auth()->user()->is_admin) {
             $currentCompany = \App\Models\Company::where('name', 'Medios Billing')->first();
         } else {
@@ -49,7 +47,7 @@
 </div>
 
 <div class="d-flex flex-column">
-    {{-- ADMINISTRATION SECTION: Only visible to Super Admins NOT currently impersonating --}}
+    {{-- ADMINISTRATION SECTION --}}
     @if($isSuperAdmin && !$isImpersonating)
         <div class="px-3 py-2 text-xs font-bold text-uppercase text-muted" style="opacity: 0.5;">
             ADMINISTRATION
@@ -70,7 +68,7 @@
         <div class="my-3" style="border-top: 1px solid rgba(255,255,255,0.1);"></div>
     @endif
 
-    {{-- BUSINESS SECTION: Visible to everyone --}}
+    {{-- BUSINESS SECTION --}}
     <div class="px-3 py-2 text-xs font-bold text-uppercase text-muted" style="opacity: 0.5;">
         BUSINESS
     </div>
@@ -89,6 +87,11 @@
 
     <a href="{{ route('quotes.index') }}" class="nav-link {{ request()->routeIs('quotes.*') ? 'active' : '' }}">
         <i class="fa-solid fa-file-signature me-2"></i> Quotes
+    </a>
+
+    {{-- NEW: TEAM MEMBERS LINK --}}
+    <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}">
+        <i class="fa-solid fa-user-group me-2"></i> Team Members
     </a>
 
     <a href="{{ route('company.settings') }}" class="nav-link {{ request()->routeIs('company.settings') ? 'active' : '' }}">

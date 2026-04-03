@@ -3,148 +3,144 @@
 @section('content')
 <div class="container-fluid">
 
-<div class="d-flex justify-content-between align-items-center mb-5">
+<div class="crm-header mb-4">
     <div>
-        <h2 class="text-white font-bold mb-1">
-            Service <span class="text-sky-400">Quotes</span>
-        </h2>
-        <p class="text-secondary small">Proposals, estimates, and customer approvals</p>
+        <h2 class="crm-title">Service <span class="text-sky-400">Quotes</span></h2>
+        <p class="crm-subtitle">Track and manage your outgoing estimates</p>
     </div>
 
-    <a href="{{ route('quotes.create') }}" class="btn btn-primary px-4 shadow-lg font-bold">
-        <i class="fa-solid fa-plus-circle mr-2"></i> Create Quote
-    </a>
-</div>
+    <div class="crm-actions">
+        <form method="GET" action="{{ route('quotes.index') }}" class="crm-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input
+                type="text"
+                name="search"
+                placeholder="Search..."
+                value="{{ request('search') }}"
+            >
+        </form>
 
-<div class="row g-4 mb-5">
-    <div class="col-md-4">
-        <div class="glass-card p-4 border-start border-warning border-4">
-            <p class="text-secondary small uppercase font-bold mb-1">Drafts</p>
-            <p class="text-white h3 mb-0 font-bold">{{ $draftCount ?? 0 }}</p>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="glass-card p-4 border-start border-info border-4">
-            <p class="text-secondary small uppercase font-bold mb-1">Sent</p>
-            <p class="text-white h3 mb-0 font-bold">{{ $sentCount ?? 0 }}</p>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="glass-card p-4 border-start border-success border-4">
-            <p class="text-secondary small uppercase font-bold mb-1">Approved</p>
-            <p class="text-success h3 mb-0 font-bold">{{ $approvedCount ?? 0 }}</p>
-        </div>
+        <a href="{{ route('quotes.create') }}" class="btn btn-success crm-btn">
+            + New Quote
+        </a>
     </div>
 </div>
 
-<div class="glass-card">
-    <div class="table-responsive">
-        <table class="table table-dark table-hover align-middle mb-0">
-            <thead class="text-secondary small uppercase">
-                <tr>
-                    <th>ID</th>
-                    <th>Customer</th>
-                    <th class="text-center">Total</th>
-                    <th class="text-center">Status</th>
-                    <th class="text-center">Contract</th> {{-- ADDED HEADER --}}
-                    <th class="text-end">Action</th>
-                </tr>
-            </thead>
+<div class="row">
 
-            <tbody>
-                @forelse($quotes ?? [] as $quote)
-                <tr>
-                    <td class="text-info font-bold">
-                        #{{ $quote->id ?? '-' }}
-                    </td>
+@forelse($quotes as $quote)
 
-                    <td>
-                        <div class="text-white font-bold">
-                            {{ optional($quote->customer)->name ?? 'Unknown Customer' }}
-                        </div>
-                        <div class="text-secondary small">
-                            {{ optional($quote->customer)->email ?? '' }}
-                        </div>
-                    </td>
+<div class="col-12 mb-3">
+    <div class="crm-row">
 
-                    <td class="text-center text-white font-bold">
-                        ${{ number_format((float) ($quote->total ?? 0), 2) }}
-                    </td>
+        <div class="crm-left">
+            <div class="avatar-circle" style="background: #a855f7;">
+                <i class="fa-solid fa-file-invoice"></i>
+            </div>
 
-                    <td class="text-center">
-                        <span class="badge bg-secondary">
-                            {{ ucfirst($quote->status ?? 'draft') }}
-                        </span>
-                    </td>
+            <div>
+                <div class="crm-name">#{{ $quote->quote_number ?? $quote->id }}</div>
+                <div class="crm-sub">{{ $quote->customer->name ?? 'Deleted Customer' }}</div>
+                <div class="crm-sub small text-secondary">
+                    {{ $quote->created_at ? $quote->created_at->format('M d, Y') : 'N/A' }}
+                </div>
+            </div>
+        </div>
 
-                    {{-- NEW CONTRACT VISIBILITY LOGIC --}}
-                    <td class="text-center">
-                        @if(($quote->contract_status ?? '') === 'signed')
-                            <span class="text-success small d-block font-bold">
-                                <i class="fa-solid fa-file-signature"></i> Signed
-                            </span>
-                            <span class="text-secondary" style="font-size: 10px;">
-                                By {{ $quote->signed_by }}
-                            </span>
-                        @else
-                            <span class="text-secondary small">Pending</span>
-                        @endif
-                    </td>
+        <div class="crm-center">
+            <div class="crm-stat">
+                <span>Amount</span>
+                <strong>${{ number_format($quote->total ?? 0, 2) }}</strong>
+            </div>
 
-                    <td class="text-end">
-                        <a href="{{ route('quotes.show', $quote->id) }}" class="btn btn-sm action-btn-pro px-3">
-                            View
-                        </a>
+            <div class="crm-stat">
+                <span>Items</span>
+                <strong>{{ isset($quote->items) ? $quote->items->count() : 0 }}</strong>
+            </div>
 
-                        <form action="{{ route('quotes.destroy', $quote->id) }}" method="POST" style="display:inline;">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit"
-                                onclick="return confirm('Delete this quote?')"
-                                class="btn btn-sm btn-danger">
-                                Delete
-                            </button>
-                        </form>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="6" class="text-center text-secondary py-4">
-                        No quotes found
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
+            <div class="crm-stat">
+                <span>Status</span>
+                @php
+                    $status = strtolower($quote->status ?? 'draft');
+                    $color = match($status) {
+                        'approved' => 'text-success',
+                        'sent' => 'text-sky-400',
+                        'declined' => 'text-danger',
+                        default => 'text-secondary',
+                    };
+                @endphp
+                <strong class="{{ $color }}">
+                    {{ strtoupper($status) }}
+                </strong>
+            </div>
+        </div>
+
+        <div class="crm-right">
+            <div class="d-flex flex-md-column flex-row justify-content-end gap-2 align-items-center">
+                <a href="{{ route('quotes.show', $quote->id) }}" class="crm-link">View</a>
+                <a href="{{ route('quotes.edit', $quote->id) }}" class="crm-link text-warning">Edit</a>
+                
+                @if(isset($quote->status) && strtolower($quote->status) === 'approved')
+                    <span class="badge bg-success text-white">SIGNED</span>
+                @endif
+            </div>
+        </div>
+
     </div>
+</div>
+
+@empty
+
+<div class="col-12">
+    <div class="glass-card text-center py-5">
+        <i class="fa-solid fa-file-circle-xmark fa-3x text-secondary mb-3"></i>
+        <p class="text-secondary">No quotes found.</p>
+    </div>
+</div>
+
+@endforelse
+
+</div>
+
+@if(method_exists($quotes, 'links'))
+<div class="mt-4">
+    {{ $quotes->links() }}
+</div>
+@endif
+
 </div>
 
 <style>
-.font-bold { font-weight: 700; }
-.uppercase { text-transform: uppercase; }
-.glass-card {
-    background: rgba(30, 41, 59, 0.4);
-    backdrop-filter: blur(10px);
-    border-radius: 10px;
-    padding: 20px;
-}
-.action-btn-pro {
-    color: #38bdf8 !important;
-    border: 1px solid #38bdf8 !important;
-    background: rgba(56, 189, 248, 0.1);
-    font-weight: 700;
-    font-size: 0.7rem;
-    transition: all 0.2s ease;
-}
-.action-btn-pro:hover {
-    background: #38bdf8 !important;
-    color: #ffffff !important;
-    border-color: #38bdf8 !important;
-    transform: translateY(-1px);
+/* Header/Actions logic is identical to Customers for consistency */
+.crm-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.crm-title { font-size: 28px; font-weight: 700; color: white; }
+.crm-subtitle { font-size: 14px; color: #94a3b8; }
+.crm-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.crm-search { display: flex; align-items: center; background: #0f172a; padding: 8px 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); }
+.crm-search input { background: transparent; border: none; color: white; margin-left: 10px; outline: none; width: 150px; }
+
+/* Row logic */
+.crm-row { display: flex; justify-content: space-between; align-items: center; background: rgba(15,23,42,0.9); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.05); }
+.crm-left { display: flex; gap: 15px; width: 30%; }
+.avatar-circle { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; flex-shrink: 0; }
+.crm-name { font-size: 16px; font-weight: 700; color: white; }
+.crm-sub { font-size: 12px; color: #94a3b8; }
+
+.crm-center { display: flex; gap: 40px; flex-grow: 1; justify-content: center; }
+.crm-stat { display: flex; flex-direction: column; align-items: center; }
+.crm-stat span { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+.crm-stat strong { font-size: 15px; color: white; }
+
+.crm-right { width: 15%; }
+.crm-link { font-size: 13px; color: #38bdf8; text-decoration: none; }
+
+/* Mobile stacking */
+@media (max-width: 767.98px) {
+    .crm-row { flex-direction: column; align-items: flex-start; gap: 1.2rem; }
+    .crm-left, .crm-center, .crm-right { width: 100% !important; text-align: left; }
+    .crm-center { justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); padding: 15px 0; gap: 10px; }
+    .crm-right .d-flex { justify-content: flex-start !important; flex-direction: row !important; flex-wrap: wrap; }
+    .crm-stat { align-items: flex-start; }
 }
 </style>
-
-</div>
 @endsection

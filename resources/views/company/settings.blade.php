@@ -3,13 +3,19 @@
 @section('content')
 <div class="container-fluid">
     <div class="mb-4">
-<h2 class="text-white fw-bold">{{ $company->name }} Settings</h2>
+        <h2 class="text-white fw-bold">{{ $company->name }} Settings</h2>
         <p class="text-secondary small">Update your business profile, branding, contract, and payment methods in one place.</p>
     </div>
 
     @if(session('success'))
         <div class="alert alert-success bg-green-500/10 border-green-500/20 text-green-500 mb-4">
             {{ session('success') }}
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger bg-red-500/10 border-red-500/20 text-red-500 mb-4">
+            {{ session('error') }}
         </div>
     @endif
 
@@ -53,7 +59,12 @@
                     <div class="mb-3">
                         <label class="text-secondary small uppercase d-block">Logo</label>
                         @if($company->logo_path)
-                            <img src="{{ asset('storage/'.$company->logo_path) }}" class="h-12 mb-2">
+                            <div class="mb-3 p-2 bg-slate-800/50 rounded inline-block">
+                                <img src="{{ asset('storage/'.$company->logo_path) }}" 
+                                     alt="Logo" 
+                                     style="max-height: 120px; width: auto; display: block;" 
+                                     class="rounded">
+                            </div>
                         @endif
                         <input type="file" name="logo" class="form-control bg-transparent border-slate-700 text-white">
                         <small class="text-secondary small">Accepted: JPG, JPEG, PNG, SVG, WEBP (Max 2MB)</small>
@@ -130,9 +141,12 @@
                         </div>
                     </div>
 
-                    <div class="mb-2">
-                        <label class="text-secondary small uppercase">Stripe Webhook Secret (Optional)</label>
-                        <input type="text" name="stripe_webhook_secret" value="{{ $company->stripe_webhook_secret }}" class="form-control bg-transparent border-slate-700 text-white" placeholder="whsec_...">
+                    <div class="row mt-3">
+                        <div class="col-md-12 mb-3">
+                            <label class="text-warning small uppercase fw-bold mb-2 d-block">Stripe Webhook Secret (WHSEC)</label>
+                            <input type="password" name="stripe_webhook_secret" value="{{ $company->stripe_webhook_secret }}" class="form-control bg-transparent border-slate-700 text-white" placeholder="whsec_...">
+                            <small class="text-secondary small">Get this from Stripe -> Developers -> Webhooks</small>
+                        </div>
                     </div>
                 </div>
 

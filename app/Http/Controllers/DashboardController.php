@@ -5,156 +5,102 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Models\Quote;
 use App\Scopes\CompanyScope;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Session;
 
 class DashboardController extends Controller
 {
     public function index()
     {
         $user = auth()->user();
+        $isImpersonating = Session::has('impersonator_id');
 
         /*
         |--------------------------------------------------------------------------
-        | 🧠 SUPPORT MODE HANDSHAKE
-        | If I am a super_admin but NOT currently impersonating, show admin stats.
-        | If I AM impersonating, skip this and show the Company Dashboard below.
+        | 🔒 THE HANDSHAKE
         |--------------------------------------------------------------------------
         */
-        if ($user->role === 'super_admin' && !session()->has('impersonator_id')) {
-
-            $companies = Company::count();
-            $users = User::count();
-            $invoices = Invoice::withoutGlobalScope(CompanyScope::class)->count();
-
-            $paidInvoices = Invoice::withoutGlobalScope(CompanyScope::class)
-                ->where('status', 'paid')
-                ->count();
-
-            $pendingInvoices = Invoice::withoutGlobalScope(CompanyScope::class)
-                ->where('status', 'unpaid')
-                ->count();
-
-            $revenue = Invoice::withoutGlobalScope(CompanyScope::class)
-                ->where('status', 'paid')
-                ->sum('total');
-
-            $invoicesThisMonth = Invoice::withoutGlobalScope(CompanyScope::class)
-                ->whereMonth('created_at', now()->month)
-                ->count();
-
-            $mrr = Company::where('subscription_status', 'active')->sum('monthly_price');
-            $arr = $mrr * 12;
-            $activeCompanies = Company::where('subscription_status', 'active')->count();
-
-            $recentInvoices = Invoice::withoutGlobalScope(CompanyScope::class)
-                ->latest()
-                ->take(5)
-                ->get();
-
-            $revenueTrendRaw = Invoice::withoutGlobalScope(CompanyScope::class)
-                ->where('status', 'paid')
-                ->selectRaw('MONTH(created_at) as month, SUM(total) as total')
-                ->groupBy('month')
-                ->pluck('total', 'month');
-
-            $revenueTrend = [];
-            for ($m = 1; $m <= 12; $m++) {
-                $revenueTrend[$m] = (float) ($revenueTrendRaw[$m] ?? 0);
+        if ($user->role !== 'super_admin' && !$isImpersonating) {
+            // 1. Force Legal NDA
+            if (!$user->legal_accepted_at) {
+                return view('company.onboarding.welcome');
             }
-
-            $topCompanies = Company::select('companies.id', 'companies.name')
-                ->join('invoices', 'companies.id', '=', 'invoices.company_id')
-                ->where('invoices.status', 'paid')
-                ->selectRaw('SUM(invoices.total) as revenue, COUNT(invoices.id) as invoices_count')
-                ->groupBy('companies.id', 'companies.name')
-                ->orderByDesc('revenue')
-                ->limit(5)
-                ->get();
-
-            $brandName = 'Medios Billing';
-            $brandLogo = null;
-            $brandColor = '#6366f1';
-
-            return view('admin.dashboard', compact(
-                'companies', 'users', 'invoices', 'paidInvoices', 'pendingInvoices',
-                'revenue', 'invoicesThisMonth', 'mrr', 'arr', 'activeCompanies',
-                'recentInvoices', 'revenueTrend', 'topCompanies', 'brandName',
-                'brandLogo', 'brandColor'
-            ));
+            // 2. Force Password Change
+            if ($user->needs_password_change) {
+                return redirect()->route('profile.edit')->with('info', 'Security update required.');
+            }
         }
 
         /*
         |--------------------------------------------------------------------------
-        | COMPANY DASHBOARD (Keeps all your original MRR and Carbon logic)
+        | 🌍 DYNAMIC GREETING (Houston Time)
+        |--------------------------------------------------------------------------
+        */
+        $hour = Carbon::now('America/Chicago')->hour;
+        if ($hour < 12) { $greeting = 'Good Morning'; }
+        elseif ($hour < 17) { $greeting = 'Good Afternoon'; }
+        else { $greeting = 'Good Evening'; }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 🧠 PLATFORM LEVEL (Super Admin)
+        |--------------------------------------------------------------------------
+        */
+        if (in_array($user->role, ['super_admin', 'admin']) && $user->company_id === null && !$isImpersonating) {
+            $companies = Company::count();
+            $revenue = Invoice::withoutGlobalScope(CompanyScope::class)->where('status', 'paid')->sum('total');
+            $activeCompanies = Company::where('subscription_status', 'active')->count();
+            $recentInvoices = Invoice::withoutGlobalScope(CompanyScope::class)->latest()->take(5)->get();
+            $mrr = Company::where('subscription_status', 'active')->sum('monthly_price');
+
+            return view('admin.dashboard', compact('companies', 'revenue', 'activeCompanies', 'recentInvoices', 'greeting', 'mrr'));
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 🏢 TENANT LEVEL (MCS, PP, etc.)
         |--------------------------------------------------------------------------
         */
         $company = $user->company;
+        if (!$company) { abort(403, 'Company not found.'); }
 
-        if (!$company) {
-            abort(403, 'No company assigned to this user.');
+        // --- ROLE-BASED DASHBOARD SPLIT ---
+        
+        if ($user->role === 'staff') {
+            // Patty (Staff) lands here. NO REVENUE DATA.
+            $recentQuotes = Quote::where('company_id', $company->id)->latest()->take(5)->get();
+            return view('company.dashboards.staff', compact('greeting', 'company', 'recentQuotes'));
         }
 
-        $companyId = $company->id;
-        $companies = 1;
-        $users = User::where('company_id', $companyId)->count();
-        $invoices = Invoice::where('company_id', $companyId)->count();
-
-        $paidInvoices = Invoice::where('company_id', $companyId)
-            ->where('status', 'paid')
-            ->count();
-
-        $pendingInvoices = Invoice::where('company_id', $companyId)
-            ->where('status', 'unpaid')
-            ->count();
-
-        $revenue = Invoice::where('company_id', $companyId)
-            ->where('status', 'paid')
-            ->sum('total');
-
-        $invoicesThisMonth = Invoice::where('company_id', $companyId)
-            ->whereMonth('created_at', Carbon::now()->month)
-            ->count();
-
-        $mrr = Invoice::where('company_id', $companyId)
-            ->where('status', 'paid')
-            ->whereMonth('created_at', now()->month)
-            ->sum('total');
-
-        $arr = $mrr * 12;
-        $activeCompanies = 1;
-
-        $recentInvoices = Invoice::where('company_id', $companyId)
-            ->latest()
-            ->take(5)
-            ->get();
-
+        // Admins & Managers land here. FULL REVENUE DATA.
+        $revenue = Invoice::where('company_id', $company->id)->where('status', 'paid')->sum('total');
+        $invoicesCount = Invoice::where('company_id', $company->id)->count();
+        $paidInvoices = Invoice::where('company_id', $company->id)->where('status', 'paid')->count();
+        $pendingInvoices = Invoice::where('company_id', $company->id)->where('status', 'unpaid')->count();
+        $recentInvoices = Invoice::where('company_id', $company->id)->latest()->take(5)->get();
+        
+        $brandName = $company->name;
         $revenueTrend = [];
         for ($m = 1; $m <= 12; $m++) {
-            $revenueTrend[$m] = (float) Invoice::where('company_id', $companyId)
+            $revenueTrend[$m] = (float) Invoice::where('company_id', $company->id)
                 ->where('status', 'paid')
                 ->whereMonth('created_at', $m)
                 ->sum('total');
         }
 
-        $topCompanies = collect([
-            (object) [
-                'name' => $company->name,
-                'revenue' => (float) $revenue,
-                'invoices_count' => $invoices,
-            ],
-        ]);
-
-        $brandName = $company->name;
-        $brandLogo = $company->logo;
-        $brandColor = $company->primary_color ?: '#6366f1';
-
         return view('dashboard', compact(
-            'companies', 'users', 'invoices', 'paidInvoices', 'pendingInvoices',
-            'revenue', 'invoicesThisMonth', 'mrr', 'arr', 'activeCompanies',
-            'recentInvoices', 'revenueTrend', 'topCompanies', 'brandName',
-            'brandLogo', 'brandColor'
+            'revenue', 'invoicesCount', 'paidInvoices', 'pendingInvoices', 
+            'recentInvoices', 'brandName', 'greeting', 'revenueTrend'
         ));
+    }
+
+    public function acceptLegal()
+    {
+        $user = Auth::user();
+        $user->update(['legal_accepted_at' => now()]);
+        return redirect()->route('dashboard');
     }
 }
