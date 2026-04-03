@@ -1,289 +1,174 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('content')
-
-<div class="max-w-7xl mx-auto px-6 py-8">
-
-    <!-- HEADER -->
-    <div class="bg-white shadow-md border border-gray-200 rounded-xl p-6 mb-6">
-        <div class="flex justify-between items-start">
+<div class="container-fluid">
+    
+    <div class="dashboard-card mb-4">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div>
-                <h1 class="text-3xl font-bold text-gray-800">
-                    {{ $customer->name }}
-                </h1>
-
+                <h2 class="text-white fw-bold mb-1">{{ $customer->name }}</h2>
                 @if($customer->company_name)
-                    <p class="text-gray-500 mt-1">{{ $customer->company_name }}</p>
+                    <p class="text-info small mb-2"><i class="fa-solid fa-building me-1"></i> {{ $customer->company_name }}</p>
                 @endif
-
-                @if($customer->email)
-                    <p class="text-gray-600 mt-3">{{ $customer->email }}</p>
-                @endif
-
-                @if($customer->phone)
-                    <p class="text-gray-600">{{ $customer->phone }}</p>
-                @endif
+                <div class="d-flex flex-wrap gap-3 mt-2">
+                    @if($customer->email)
+                        <span class="text-secondary small"><i class="fa-solid fa-envelope me-1"></i> {{ $customer->email }}</span>
+                    @endif
+                    @if($customer->phone)
+                        <span class="text-secondary small"><i class="fa-solid fa-phone me-1"></i> {{ $customer->phone }}</span>
+                    @endif
+                </div>
             </div>
-
-            <div class="flex gap-3">
-                <a href="{{ route('customers.index') }}"
-                   class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-2 rounded-lg font-semibold">
-                    Back
+            <div class="d-flex gap-2">
+                <a href="{{ route('customers.index') }}" class="btn btn-secondary btn-sm px-3">
+                    <i class="fa-solid fa-arrow-left me-1"></i> Back
                 </a>
-
-                <a href="{{ route('customers.edit', $customer->id) }}"
-                   class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow font-semibold">
-                    Edit Customer
+                <a href="{{ route('customers.edit', $customer->id) }}" class="btn btn-primary btn-sm px-3">
+                    <i class="fa-solid fa-user-pen me-1"></i> Edit
                 </a>
             </div>
         </div>
     </div>
 
-    <!-- TAB NAVIGATION -->
-    <div style="margin-top:25px;border-bottom:1px solid #ddd;padding-bottom:10px;">
-
-        <a href="#summary" class="tab-link active" onclick="openTab(event,'summary')">
-            Summary
-        </a>
-
-        <a href="#quotes" class="tab-link" onclick="openTab(event,'quotes')">
-            Quotes
-        </a>
-
-        <a href="#invoices" class="tab-link" onclick="openTab(event,'invoices')">
-            Invoices
-        </a>
-
-        <a href="#emails" class="tab-link" onclick="openTab(event,'emails')">
-            Emails
-        </a>
-
-        <a href="#notes" class="tab-link" onclick="openTab(event,'notes')">
-            Notes
-        </a>
-
-        <a href="#activity" class="tab-link" onclick="openTab(event,'activity')">
-            Activity
-        </a>
-
+    <div class="d-flex flex-wrap gap-2 mb-4 border-bottom border-secondary border-opacity-25 pb-3">
+        <button class="tab-link active" onclick="openTab(event,'summary')">Summary</button>
+        <button class="tab-link" onclick="openTab(event,'quotes')">Quotes</button>
+        <button class="tab-link" onclick="openTab(event,'invoices')">Invoices</button>
+        <button class="tab-link" onclick="openTab(event,'emails')">Emails</button>
+        <button class="tab-link" onclick="openTab(event,'notes')">Notes</button>
     </div>
+
+    <div id="summary" class="tab-content active">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="dashboard-card text-center py-4 border-start border-primary border-4">
+                    <p class="text-secondary small uppercase fw-bold mb-1">Quotes</p>
+                    <h2 class="text-white mb-0">{{ $customer->quotes->count() }}</h2>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="dashboard-card text-center py-4 border-start border-success border-4">
+                    <p class="text-secondary small uppercase fw-bold mb-1">Invoices</p>
+                    <h2 class="text-white mb-0">{{ $customer->invoices->count() }}</h2>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="dashboard-card text-center py-4 border-start border-info border-4">
+                    <p class="text-secondary small uppercase fw-bold mb-1">Total Value</p>
+                    <h2 class="text-white mb-0">${{ number_format($customer->invoices->sum('total'), 2) }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="quotes" class="tab-content">
+        <div class="dashboard-card">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="text-white fw-bold mb-0">Quotes</h4>
+                <a href="{{ route('quotes.create',['customer_id'=>$customer->id]) }}" class="btn btn-info btn-sm fw-bold">
+                    <i class="fa-solid fa-plus me-1"></i> New Quote
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle">
+                    <thead>
+                        <tr class="text-secondary small uppercase">
+                            <th>Quote ID</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($customer->quotes as $quote)
+                        <tr>
+                            <td class="text-info fw-bold">#{{ $quote->id }}</td>
+                            <td class="text-white">${{ number_format($quote->total, 2) }}</td>
+                            <td><span class="badge bg-{{ $quote->status == 'approved' ? 'success' : 'warning' }}">{{ ucfirst($quote->status) }}</span></td>
+                            <td class="text-secondary small">{{ $quote->created_at->format('M d, Y') }}</td>
+                            <td class="text-end">
+                                <a href="{{ route('quotes.show', $quote->id) }}" class="btn btn-outline-info btn-sm">View</a>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="5" class="text-center py-4 text-secondary">No quotes found for this customer.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="invoices" class="tab-content">
+        <div class="dashboard-card">
+            <h4 class="text-white fw-bold mb-4">Invoices</h4>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle">
+                    <thead>
+                        <tr class="text-secondary small uppercase">
+                            <th>Invoice ID</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($customer->invoices as $invoice)
+                        <tr>
+                            <td class="text-info fw-bold">#{{ $invoice->id }}</td>
+                            <td class="text-white">${{ number_format($invoice->total, 2) }}</td>
+                            <td><span class="badge bg-{{ $invoice->status == 'paid' ? 'success' : 'warning' }}">{{ ucfirst($invoice->status) }}</span></td>
+                            <td class="text-secondary small">{{ $invoice->created_at->format('M d, Y') }}</td>
+                            <td class="text-end">
+                                <a href="{{ route('invoice.view', $invoice->id) }}" class="btn btn-outline-info btn-sm">View</a>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="5" class="text-center py-4 text-secondary">No invoices found for this customer.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="emails" class="tab-content text-secondary text-center py-5 dashboard-card">Email history coming soon...</div>
+    <div id="notes" class="tab-content text-secondary text-center py-5 dashboard-card">Internal notes coming soon...</div>
+
+</div>
 
 <style>
-
-.tab-link{
-padding:10px 16px;
-margin-right:6px;
-background:#f3f4f6;
-border-radius:6px;
-text-decoration:none;
-color:#374151;
-font-weight:600;
-cursor:pointer;
-display:inline-block;
-}
-
-.tab-link.active{
-background:#2563eb;
-color:white;
-}
-
-.tab-content{
-display:none;
-margin-top:20px;
-}
-
-.tab-content.active{
-display:block;
-}
-
+    .tab-link {
+        padding: 10px 20px;
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.3s;
+        border-radius: 8px;
+    }
+    .tab-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    .tab-link.active {
+        color: #38bdf8;
+        background: rgba(56, 189, 248, 0.1);
+    }
+    .tab-content { display: none; margin-top: 20px; animation: fadeIn 0.3s ease; }
+    .tab-content.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .uppercase { text-transform: uppercase; letter-spacing: 1px; }
 </style>
 
-<!-- SUMMARY TAB -->
-<div id="summary" class="tab-content active">
-
-<div class="grid grid-cols-3 gap-6 mb-6 mt-6">
-
-    <div class="bg-white shadow-md border border-gray-200 rounded-xl p-6">
-        <p class="text-gray-500 text-sm">Quotes</p>
-        <p class="text-3xl font-bold text-blue-700">
-            {{ $customer->quotes->count() }}
-        </p>
-    </div>
-
-    <div class="bg-white shadow-md border border-gray-200 rounded-xl p-6">
-        <p class="text-gray-500 text-sm">Invoices</p>
-        <p class="text-3xl font-bold text-green-700">
-            {{ $customer->invoices->count() }}
-        </p>
-    </div>
-
-    <div class="bg-white shadow-md border border-gray-200 rounded-xl p-6">
-        <p class="text-gray-500 text-sm">Emails</p>
-        <p class="text-3xl font-bold text-purple-700">0</p>
-    </div>
-
-</div>
-
-</div>
-
-<!-- QUOTES TAB -->
-<div id="quotes" class="tab-content">
-
-<h3 class="text-xl font-semibold mt-6 mb-4">Quotes</h3>
-
-<a href="{{ route('quotes.create',['customer_id'=>$customer->id]) }}"
-style="background:#2563eb;color:white;padding:8px 12px;border-radius:6px;text-decoration:none;">
-+ New Quote
-</a>
-
-<br><br>
-
-<table width="100%" border="1" cellpadding="10" style="border-collapse:collapse;">
-
-<tr>
-<th>Quote</th>
-<th>Total</th>
-<th>Status</th>
-<th>Date</th>
-<th>Action</th>
-</tr>
-
-@forelse($customer->quotes as $quote)
-
-<tr>
-
-<td>#{{ $quote->id }}</td>
-
-<td>${{ number_format($quote->total,2) }}</td>
-
-<td>{{ ucfirst($quote->status) }}</td>
-
-<td>{{ $quote->created_at->format('M d, Y') }}</td>
-
-<td>
-
-<a href="{{ route('quotes.show',$quote->id) }}"
-style="background:#2563eb;color:white;padding:6px 10px;border-radius:6px;text-decoration:none;">
-View
-</a>
-
-</td>
-
-</tr>
-
-@empty
-
-<tr>
-<td colspan="5">No quotes yet.</td>
-</tr>
-
-@endforelse
-
-</table>
-
-</div>
-
-<!-- INVOICES TAB -->
-<div id="invoices" class="tab-content">
-
-<h3 class="text-xl font-semibold mt-6 mb-4">Invoices</h3>
-
-<table width="100%" border="1" cellpadding="10" style="border-collapse:collapse;">
-
-<tr>
-<th>Invoice</th>
-<th>Total</th>
-<th>Status</th>
-<th>Date</th>
-<th>Action</th>
-</tr>
-
-@forelse($customer->invoices as $invoice)
-
-<tr>
-
-<td>#{{ $invoice->id }}</td>
-
-<td>${{ number_format($invoice->total,2) }}</td>
-
-<td>{{ ucfirst($invoice->status) }}</td>
-
-<td>{{ $invoice->created_at->format('M d, Y') }}</td>
-
-<td>
-
-<a href="{{ route('invoice.view',$invoice->id) }}"
-style="background:#2563eb;color:white;padding:6px 10px;border-radius:6px;text-decoration:none;">
-View
-</a>
-
-</td>
-
-</tr>
-
-@empty
-
-<tr>
-<td colspan="5">No invoices yet.</td>
-</tr>
-
-@endforelse
-
-</table>
-
-</div>
-
-<!-- EMAILS TAB -->
-<div id="emails" class="tab-content">
-
-<h3 class="text-xl font-semibold mt-6 mb-4">Emails</h3>
-
-<p>Email history will appear here.</p>
-
-</div>
-
-<!-- NOTES TAB -->
-<div id="notes" class="tab-content">
-
-<h3 class="text-xl font-semibold mt-6 mb-4">Notes</h3>
-
-<p>Internal notes about the customer.</p>
-
-</div>
-
-<!-- ACTIVITY TAB -->
-<div id="activity" class="tab-content">
-
-<h3 class="text-xl font-semibold mt-6 mb-4">Activity</h3>
-
-<p>Customer activity log will appear here.</p>
-
-</div>
-
-</div>
-
 <script>
-
-function openTab(evt, tabName) {
-
-var tabs = document.getElementsByClassName("tab-content");
-
-for (var i = 0; i < tabs.length; i++) {
-tabs[i].classList.remove("active");
-}
-
-var links = document.getElementsByClassName("tab-link");
-
-for (var i = 0; i < links.length; i++) {
-links[i].classList.remove("active");
-}
-
-document.getElementById(tabName).classList.add("active");
-
-evt.currentTarget.classList.add("active");
-
-}
-
+    function openTab(evt, tabName) {
+        var tabs = document.getElementsByClassName("tab-content");
+        for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove("active"); }
+        var links = document.getElementsByClassName("tab-link");
+        for (var i = 0; i < links.length; i++) { links[i].classList.remove("active"); }
+        document.getElementById(tabName).classList.add("active");
+        evt.currentTarget.classList.add("active");
+    }
 </script>
-
 @endsection

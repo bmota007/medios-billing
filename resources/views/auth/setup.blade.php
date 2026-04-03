@@ -19,7 +19,7 @@
             align-items: center;
             justify-content: center;
             margin: 0;
-            padding: 20px;
+            padding: 15px; /* Added padding so it doesn't touch screen edges */
         }
 
         .glass-card {
@@ -28,29 +28,31 @@
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 1.5rem;
-            padding: 2.5rem;
+            padding: 2rem; /* Balanced padding */
             width: 100%;
-            max-width: 500px;
+            max-width: 480px; /* Slightly narrower for better mobile fit */
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            box-sizing: border-box; /* Crucial for responsiveness */
         }
 
-        .logo-text { font-weight: 800; letter-spacing: -0.5px; margin-bottom: 0.5rem; }
-        .form-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: #94a3b8; margin-bottom: 0.5rem; }
+        .logo-text { font-weight: 800; letter-spacing: -0.5px; margin-bottom: 0.5rem; font-size: 1.5rem; }
+        .form-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: #94a3b8; margin-bottom: 0.4rem; }
         .text-info-custom { color: #38bdf8; }
 
         .form-control {
             background: rgba(15, 23, 42, 0.5) !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
             color: white !important;
-            padding: 0.8rem 1rem;
+            padding: 0.7rem 0.9rem;
             border-radius: 0.75rem;
+            font-size: 16px; /* Prevents iOS auto-zoom on focus */
         }
 
         .stripe-placeholder {
             background: rgba(56, 189, 248, 0.05);
             border: 1px dashed rgba(56, 189, 248, 0.3);
             border-radius: 0.75rem;
-            padding: 1.25rem;
+            padding: 1rem;
             margin-top: 0.5rem;
         }
 
@@ -58,11 +60,18 @@
             background-color: #38bdf8 !important;
             border: none !important;
             font-weight: 800;
-            padding: 1rem;
+            padding: 0.9rem;
             color: #0f172a !important;
             border-radius: 0.75rem;
             text-transform: uppercase;
             margin-top: 1rem;
+            width: 100%;
+        }
+
+        /* Mobile specific tweaks */
+        @media (max-width: 480px) {
+            .glass-card { padding: 1.5rem; border-radius: 1.25rem; }
+            .logo-text { font-size: 1.2rem; }
         }
     </style>
 </head>
@@ -77,7 +86,7 @@
 
     @if ($errors->any())
         <div class="alert alert-danger border-0 bg-danger text-white small mb-4" style="--bs-bg-opacity: .2;">
-            <ul class="mb-0">
+            <ul class="mb-0 px-2">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
@@ -92,10 +101,9 @@
         <div class="mb-3">
             <label class="form-label">Set Your Password</label>
             <input type="password" name="password" class="form-control" placeholder="••••••••" required>
-            <div class="x-small text-white-50 mt-1" style="font-size: 0.7rem;">Minimum 8 characters</div>
         </div>
 
-        <div class="mb-4">
+        <div class="mb-3">
             <label class="form-label">Confirm Password</label>
             <input type="password" name="password_confirmation" class="form-control" placeholder="••••••••" required>
         </div>
@@ -106,22 +114,20 @@
             </label>
             <div class="stripe-placeholder">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="small text-white-50">Secure Card Capture via Stripe</span>
-                    <i class="fa-brands fa-cc-visa fa-xl text-secondary"></i>
+                    <span class="small text-white-50" style="font-size: 0.65rem;">Secure Capture via Stripe</span>
+                    <i class="fa-brands fa-cc-visa fa-lg text-secondary"></i>
                 </div>
-                
                 <input type="hidden" name="payment_method" value="pm_card_visa">
-                
-                <div class="text-info-custom small font-monospace" style="font-size: 0.7rem;">
+                <div class="text-info-custom small font-monospace" style="font-size: 0.6rem;">
                     [ STRIPE ELEMENTS ACTIVE ]
                 </div>
             </div>
-            <p class="mt-2 text-secondary" style="font-size: 0.7rem; line-height: 1.4;">
-                <i class="fa-solid fa-circle-info me-1"></i> No charge today. Trial auto-billing begins in 7 days.
+            <p class="mt-2 text-secondary" style="font-size: 0.65rem; line-height: 1.3;">
+                <i class="fa-solid fa-circle-info me-1"></i> No charge today. Trial ends in 7 days.
             </p>
         </div>
 
-        <button type="submit" class="btn btn-activate w-100 shadow">
+        <button type="submit" class="btn btn-activate shadow">
             Start My Free Trial
         </button>
     </form>

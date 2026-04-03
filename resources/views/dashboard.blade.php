@@ -2,6 +2,21 @@
 
 @section('content')
 <div class="container-fluid">
+
+    {{-- TRIAL ACTIVATION BANNER (THE WOW BANNER) --}}
+    @if(auth()->user()->company->subscription_status !== 'trialing' && auth()->user()->company->subscription_status !== 'active')
+    <div class="alert shadow-lg border-0 d-flex justify-content-between align-items-center p-4 mb-5" 
+         style="background: linear-gradient(90deg, #1e293b, #334155); border-left: 5px solid #38bdf8 !important; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.05);">
+        <div>
+            <h5 class="text-white fw-bold mb-1">Your 7-Day Free Trial is Waiting!</h5>
+            <p class="text-secondary mb-0 small">Unlock automated billing, custom branding, and unlimited invoices today.</p>
+        </div>
+        <a href="{{ route('subscribe') }}" class="btn btn-info fw-bold px-4 py-2" style="border-radius: 0.75rem; background-color: #38bdf8; color: #0f172a; border: none;">
+            ACTIVATE TRIAL
+        </a>
+    </div>
+    @endif
+
     {{-- Header Section with Personalized Greeting --}}
     <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
         <div>

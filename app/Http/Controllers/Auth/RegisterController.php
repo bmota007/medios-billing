@@ -90,6 +90,6 @@ class RegisterController extends Controller
         ]);
 
         Auth::login($user);
-        return redirect()->route('dashboard');
+eturn redirect()->route('dashboard')->with('success', 'Setup complete! Explore your dashboard.');
     }
 }

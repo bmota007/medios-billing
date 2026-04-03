@@ -1,0 +1,62 @@
+[90m= [39m[34;4mApp\Models\Company[39;24m {#6599
+    [34mid[39m: [35m3[39m,
+    [34mname[39m: "[32mPronto Painting[39m",
+    [34mis_active[39m: [35m1[39m,
+    [34mlogo_path[39m: "[32mlogos/Logo_1775106253.png[39m",
+    [34mcontract_template_path[39m: [36mnull[39m,
+    [34mcontract_template_type[39m: "[32mpdf[39m",
+    [34memail[39m: "[32minfo@prontopainting.net[39m",
+    [34msetup_token[39m: [36mnull[39m,
+    [34mlogo[39m: [36mnull[39m,
+    [34mprimary_color[39m: "[32m#0ea5e9[39m",
+    [34mphone[39m: "[32m513-807-6946[39m",
+    [34maddress[39m: "[32m5177 Leona Dr. Cincinnati, Ohio 45238[39m",
+    [34mdomain[39m: [36mnull[39m,
+    [34msubdomain[39m: [36mnull[39m,
+    [34mplan_name[39m: [36mnull[39m,
+    [34mmonthly_price[39m: "[32m0.00[39m",
+    [34msubscription_status[39m: "[32mactive[39m",
+    [34msubscription_started_at[39m: [36mnull[39m,
+    [34msubscription_ends_at[39m: "[32m2026-04-30 09:23:01[39m",
+    [34mcreated_at[39m: "[32m2026-03-30 07:45:25[39m",
+    [34mupdated_at[39m: "[32m2026-04-02 05:04:13[39m",
+    [34mtrial_ends_at[39m: "[32m2026-04-29 07:45:25[39m",
+    [34mstripe_id[39m: [36mnull[39m,
+    [34mstripe_payment_method_id[39m: [36mnull[39m,
+    [34mwebsite[39m: "[32mprontopainting.net[39m",
+    [34mis_vetted[39m: [35m0[39m,
+    [34mplan[39m: "[32mFree[39m",
+    [34mmrr[39m: [35m0[39m,
+    [34mindustry[39m: [36mnull[39m,
+    [34mstatus[39m: "[32mActive[39m",
+    [34mlast_login_at[39m: [36mnull[39m,
+    [34maccept_card[39m: [35m1[39m,
+    [34maccept_check[39m: [35m1[39m,
+    [34maccept_cash[39m: [35m1[39m,
+    [34maccept_zelle[39m: [35m1[39m,
+    [34maccept_venmo[39m: [35m1[39m,
+    [34mzelle_label[39m: "[32mZelle[39m",
+    [34mzelle_value[39m: "[32minfo@prontopainting.net[39m",
+    [34mvenmo_label[39m: "[32mVenmo[39m",
+    [34mvenmo_value[39m: [36mnull[39m,
+    [34mstreet_address[39m: "[32m5177 Leona Dr[39m",
+    [34mcity_state_zip[39m: "[32mCincinnati, OH 45238[39m",
+    [34mstripe_publishable_key[39m: [36mnull[39m,
+    [34mstripe_secret_key[39m: "[32msk_test_51TGre5FzV55wuUkTwddPhZEByKU5L9v9rLWPSi7e98iWib7CyovyyKmH6dRNyduxN8heE8Yn4eOKnYPPFINjZM3M001bhO0A1b[39m",
+    [34mstripe_test_publishable_key[39m: "[32mpk_test_51TGre5FzV55wuUkTDyFjtharM9iKlDdx524eIuzxqKsnkjRsxcLMPbVRtnzMziLf3r8NIVpo7zaOWpJ1XZJfDrG500d87Rbx6c[39m",
+    [34mstripe_test_secret_key[39m: "[32msk_test_51TGre5FzV55wuUkTwddPhZEByKU5L9v9rLWPSi7e98iWib7CyovyyKmH6dRNyduxN8heE8Yn4eOKnYPPFINjZM3M001bhO0A1b[39m",
+    [34mstripe_mode[39m: "[32mtest[39m",
+    [34mstripe_webhook_secret[39m: "[32mwhsec_9Ju4O4sJNQPeWGQUThWDbKd2aEBarOQC[39m",
+    [34mcontract_terms[39m: """
+      [32m• **CUSTOMER RESPONSIBILITIES**: Customer provides water and electricity at no cost to Contractor. Customer shall identify property boundaries and sensitive areas [cite: 101, 102].[39m\n
+      [32m• **CHANGE ORDERS**: Any modification to scope, project cost, or project schedule must be approved in writing by both Contractor and Customer [cite: 94, 95].[39m\n
+      [32m• **PAINT CURING**: Contractor is not responsible for damage to fresh or uncured paint after leaving the job site, including damage caused by pets, furniture, or third parties [cite: 108, 110, 111, 112].[39m\n
+      [32m• **CLEANUP**: Contractor will remove job-related debris and materials upon completion [cite: 106].[39m\n
+      [32m• **PROPERTY CONDITIONS**: Contractor is not responsible for pre-existing conditions including hidden water damage, rotten wood, or mold hidden beneath surfaces[cite: 114, 115, 116, 118].[39m\n
+      [32m• **SCHEDULING**: Project start and completion dates are estimated and not guaranteed. Contractor is not responsible for delays caused by weather or material shortages [cite: 121, 123, 124].[39m\n
+      [32m• **VALIDITY**: This proposal remains valid for 30 calendar days[cite: 57, 128].[39m
+      """,
+    [34mcustom_price[39m: [36mnull[39m,
+    [34mbilling_cycle[39m: "[32mmonthly[39m",
+  }
+

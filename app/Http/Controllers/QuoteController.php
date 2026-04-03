@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class QuoteController extends Controller
 {
@@ -22,13 +23,17 @@ class QuoteController extends Controller
                 $quote->customer = (object)['name' => 'Unknown Customer', 'email' => '', 'phone' => ''];
             }
         }
-        return view('quotes.index', compact('quotes'));
+        $brandName = auth()->user()->company->name ?? 'Medios Billing';
+        $greeting = $this->getGreeting();
+        return view('quotes.index', compact('quotes', 'brandName', 'greeting'));
     }
 
     public function create()
     {
         $customers = Customer::where('company_id', auth()->user()->company_id)->get();
-        return view('quotes.create', compact('customers'));
+        $brandName = auth()->user()->company->name ?? 'Medios Billing';
+        $greeting = $this->getGreeting();
+        return view('quotes.create', compact('customers', 'brandName', 'greeting'));
     }
 
     public function store(Request $request)
@@ -71,66 +76,54 @@ class QuoteController extends Controller
         } catch (\Exception $e) { return back()->with('error', 'Store Error: ' . $e->getMessage()); }
     }
 
-    public function show(Quote $quote) { $quote->load(['customer', 'items', 'company']); return view('quotes.show', compact('quote')); }
+    public function show(Quote $quote) 
+    { 
+        $quote->load(['customer', 'items', 'company']); 
+        $brandName = auth()->user()->company->name ?? 'Medios Billing';
+        $greeting = $this->getGreeting();
+        return view('quotes.show', compact('quote', 'brandName', 'greeting')); 
+    }
 
     public function publicView($token) { $quote = Quote::with(['customer', 'items', 'company'])->where('public_token', $token)->firstOrFail(); return view('quotes.public', compact('quote')); }
 
     public function showContract($token) { $quote = Quote::with(['customer', 'items', 'company'])->where('public_token', $token)->firstOrFail(); return view('quotes.contract', compact('quote')); }
 
-public function signContract(Request $request, $token)
-{
-    try {
-        $quote = Quote::with(['company', 'customer'])->where('public_token', $token)->firstOrFail();
-        
-        $quote->update([
-            'contract_status' => 'signed',
-            'contract_signed_at' => now(),
-            'signed_by' => $request->sign_name ?? 'Customer',
-            'status' => 'approved'
-        ]);
-
-        // Create the invoice first so we have the ID/No for the email
-        $invoice = $this->createInvoiceFromQuote($quote);
-
-        // ✅ 1. SEND NOTIFICATION TO COMPANY (Using your contract_signed template)
+    public function signContract(Request $request, $token)
+    {
         try {
-            Mail::send('emails.contract_signed', ['quote' => $quote, 'invoice' => $invoice], function ($m) use ($quote) {
-                $m->to($quote->company->email)
-                  ->subject('🖋️ Contract Signed: Quote #' . $quote->quote_number . ' - ' . $quote->customer->name);
-            });
+            $quote = Quote::with(['company', 'customer'])->where('public_token', $token)->firstOrFail();
+            
+            $quote->update([
+                'contract_status' => 'signed',
+                'contract_signed_at' => now(),
+                'signed_by' => $request->sign_name ?? 'Customer',
+                'status' => 'approved'
+            ]);
+
+            $invoice = $this->createInvoiceFromQuote($quote);
+
+            try {
+                Mail::send('emails.contract_signed', ['quote' => $quote, 'invoice' => $invoice], function ($m) use ($quote) {
+                    $m->to($quote->company->email)
+                      ->subject('🖋️ Contract Signed: Quote #' . $quote->quote_number . ' - ' . $quote->customer->name);
+                });
+            } catch (\Exception $e) { Log::error("Company Notification Fail: " . $e->getMessage()); }
+
+            if ($invoice) {
+                return redirect()->route('invoice.public_view', ['invoice_no' => $invoice->invoice_no]);
+            }
+            return redirect()->route('quotes.public', $token)->with('success', 'Contract Signed!');
         } catch (\Exception $e) {
-            Log::error("Company Sign Notification Fail: " . $e->getMessage());
+            Log::error("Signing Error: " . $e->getMessage());
+            return "Server Error during signing.";
         }
-
-        // ✅ 2. SEND CONFIRMATION TO CUSTOMER (Using your quote_approved template)
-        try {
-            Mail::send('emails.quote_approved', ['quote' => $quote], function ($m) use ($quote) {
-                $m->to($quote->customer->email)
-                  ->subject('✅ Quote Approved & Contract Signed - ' . $quote->company->name);
-            });
-        } catch (\Exception $e) {
-            Log::error("Customer Sign Notification Fail: " . $e->getMessage());
-        }
-
-        if ($invoice) {
-            return redirect()->route('invoice.public_view', ['invoice_no' => $invoice->invoice_no]);
-        }
-        
-        return redirect()->route('quotes.public', $token)->with('success', 'Contract Signed!');
-
-    } catch (\Exception $e) {
-        Log::error("Signing Error: " . $e->getMessage());
-        return "Server Error during signing. Our team has been notified.";
     }
-}
 
     public function approve($token)
     {
         $quote = Quote::where('public_token', $token)->firstOrFail();
         $quote->update(['status' => 'approved', 'accepted_at' => now()]);
-        
         if ($quote->contract_required) { return redirect()->route('quotes.contract', ['token' => $token]); }
-
         $invoice = $this->createInvoiceFromQuote($quote);
         return redirect()->route('invoice.public_view', ['invoice_no' => $invoice->invoice_no]);
     }
@@ -161,63 +154,51 @@ public function signContract(Request $request, $token)
                 'total' => ($quote->deposit_amount > 0) ? (float) $quote->deposit_amount : (float) $quote->total,
                 'status' => 'unpaid',
             ]);
-        } catch (\Exception $e) {
-            Log::error("Invoice Generation Fail: " . $e->getMessage());
-            return null;
-        }
+        } catch (\Exception $e) { Log::error("Invoice Fail: " . $e->getMessage()); return null; }
     }
 
     public function edit($id)
     {
         $quote = Quote::with(['items', 'customer'])->findOrFail($id);
         $customers = Customer::where('company_id', auth()->user()->company_id)->get();
-        return view('quotes.create', compact('quote', 'customers'));
+        $brandName = auth()->user()->company->name ?? 'Medios Billing';
+        $greeting = $this->getGreeting();
+        return view('quotes.create', compact('quote', 'customers', 'brandName', 'greeting'));
     }
 
-public function update(Request $request, $id)
-{
-    $quote = Quote::findOrFail($id);
-    
-    // 1. Calculate the new total
-    $total = 0;
-    foreach ($request->items as $item) { 
-        $total += ((float)$item['qty'] * (float)$item['price']); 
-    }
+    public function update(Request $request, $id)
+    {
+        $quote = Quote::findOrFail($id);
+        $total = 0;
+        foreach ($request->items as $item) { $total += ((float)$item['qty'] * (float)$item['price']); }
 
-    // 2. RECALCULATE DEPOSIT MATH (This was the missing piece)
-    $depositAmount = 0;
-    if ($request->deposit_type === 'percentage') { 
-        $depositAmount = ($total * (float)$request->deposit_value) / 100; 
-    } elseif ($request->deposit_type === 'fixed') { 
-        $depositAmount = (float)$request->deposit_value; 
-    }
+        $depositAmount = 0;
+        if ($request->deposit_type === 'percentage') { $depositAmount = ($total * (float)$request->deposit_value) / 100; } 
+        elseif ($request->deposit_type === 'fixed') { $depositAmount = (float)$request->deposit_value; }
 
-    // 3. Update the Quote
-    $quote->update([
-        'customer_id' => $request->customer_id,
-        'subtotal' => $total,
-        'total' => $total,
-        'deposit_type' => $request->deposit_type,
-        'deposit_value' => $request->deposit_value,
-        'deposit_amount' => $depositAmount, // Update the actual dollars
-        'remaining_amount' => $total - $depositAmount, // Update the remainder
-        'contract_required' => $request->has('contract_required'),
-    ]);
-
-    // Update items as you were doing before...
-    $quote->items()->delete();
-    foreach ($request->items as $item) {
-        QuoteItem::create([
-            'quote_id' => $quote->id,
-            'service_name' => $item['service'],
-            'quantity' => $item['qty'],
-            'unit_price' => $item['price'],
-            'line_total' => $item['qty'] * $item['price'],
+        $quote->update([
+            'customer_id' => $request->customer_id,
+            'subtotal' => $total,
+            'total' => $total,
+            'deposit_type' => $request->deposit_type,
+            'deposit_value' => $request->deposit_value,
+            'deposit_amount' => $depositAmount,
+            'remaining_amount' => $total - $depositAmount,
+            'contract_required' => $request->has('contract_required'),
         ]);
-    }
 
-    return redirect()->route('quotes.show', $quote->id);
-}
+        $quote->items()->delete();
+        foreach ($request->items as $item) {
+            QuoteItem::create([
+                'quote_id' => $quote->id,
+                'service_name' => $item['service'],
+                'quantity' => $item['qty'],
+                'unit_price' => $item['price'],
+                'line_total' => $item['qty'] * $item['price'],
+            ]);
+        }
+        return redirect()->route('quotes.show', $quote->id);
+    }
 
     public function destroy($id) { Quote::findOrFail($id)->delete(); return redirect()->route('quotes.index'); }
 
@@ -233,19 +214,11 @@ public function update(Request $request, $id)
         return back()->with('success', 'Quote sent!');
     }
 
-    public function stripeCheckout($token)
+    private function getGreeting() 
     {
-        $quote = Quote::where('public_token', $token)->firstOrFail();
-        $company = $quote->company;
-        \Stripe\Stripe::setApiKey($company->stripe_mode === 'live' ? $company->stripe_secret_key : $company->stripe_test_secret_key);
-        $session = \Stripe\Checkout\Session::create([
-            'payment_method_types' => ['card'],
-            'line_items' => [['price_data' => ['currency' => 'usd', 'product_data' => ['name' => 'Quote #'.$quote->quote_number], 'unit_amount' => (int)(($quote->deposit_amount > 0 ? $quote->deposit_amount : $quote->total) * 100)], 'quantity' => 1]],
-            'mode' => 'payment',
-            'success_url' => route('stripe.success', ['invoice_no' => $quote->quote_number]),
-            'cancel_url' => route('quotes.public', $token),
-            'metadata' => ['quote_id' => $quote->id, 'company_id' => $company->id],
-        ]);
-        return redirect($session->url);
+        $hour = date('H');
+        if ($hour < 12) return 'Good Morning';
+        if ($hour < 17) return 'Good Afternoon';
+        return 'Good Evening';
     }
 }

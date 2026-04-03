@@ -19,13 +19,22 @@ class CheckSubscription
 
         $company = $user->company;
 
-        // 2. If no card is on file, force them to the setup page
-        if (!$company->stripe_payment_method_id && !$request->is('subscribe*') && !$request->is('logout')) {
-            return redirect()->route('subscribe')->with('error', 'Please provide a valid payment method to start your 7-day free trial.');
+        /**
+         * 2. SOFTEN THE BOUNCER
+         * We REMOVE the "force to subscribe" if no card is on file.
+         * Now, they can access the Dashboard, but we still protect 
+         * sensitive routes like 'invoices/create' if you want.
+         */
+        
+        // Example: Only force subscription if they try to CREATE an invoice
+        /*
+        if (!$company->stripe_payment_method_id && $request->is('invoices/create')) {
+             return redirect()->route('subscribe')->with('info', 'Please activate your 7-day trial to create invoices.');
         }
+        */
 
-        // 3. If account is locked (Day 3 of failure)
-        if (!$company->is_active && !$request->is('billing-locked') && !$request->is('subscribe*')) {
+        // 3. Keep the "Hard Lock" for non-payment (After the 7 days/failed bill)
+        if (!$company->is_active && !$request->is('billing-locked') && !$request->is('subscribe*') && !$request->is('logout')) {
             return redirect()->route('billing.locked');
         }
 

@@ -82,7 +82,8 @@ Route::post('/logout', function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->group(function () {
-    Route::get('/subscribe', function () { return view('billing.subscribe'); })->name('subscribe');
+    // FIXED: Changed 'billing.subscribe' to 'subscribe' to match your view location
+    Route::get('/subscribe', function () { return view('subscribe'); })->name('subscribe');
     Route::post('/process-subscription', [BillingController::class, 'processSubscription'])->name('process.subscription');
     Route::post('/billing/pay', [BillingController::class, 'processSubscription'])->name('billing.pay');
 });
