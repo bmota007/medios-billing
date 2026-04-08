@@ -2,105 +2,90 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use App\Models\Company;
 use App\Models\Invoice;
-use App\Models\User;
 use App\Models\Quote;
-use App\Scopes\CompanyScope;
-use Carbon\Carbon;
+use App\Models\Customer;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\DB;
+use Stripe\Stripe;
+use Stripe\Checkout\Session;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $user = auth()->user();
-        $isImpersonating = Session::has('impersonator_id');
-
-        /*
-        |--------------------------------------------------------------------------
-        | 🔒 THE HANDSHAKE
-        |--------------------------------------------------------------------------
-        */
-        if ($user->role !== 'super_admin' && !$isImpersonating) {
-            // 1. Force Legal NDA
-            if (!$user->legal_accepted_at) {
-                return view('company.onboarding.welcome');
-            }
-            // 2. Force Password Change
-            if ($user->needs_password_change) {
-                return redirect()->route('profile.edit')->with('info', 'Security update required.');
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | 🌍 DYNAMIC GREETING (Houston Time)
-        |--------------------------------------------------------------------------
-        */
-        $hour = Carbon::now('America/Chicago')->hour;
-        if ($hour < 12) { $greeting = 'Good Morning'; }
-        elseif ($hour < 17) { $greeting = 'Good Afternoon'; }
-        else { $greeting = 'Good Evening'; }
-
-        /*
-        |--------------------------------------------------------------------------
-        | 🧠 PLATFORM LEVEL (Super Admin)
-        |--------------------------------------------------------------------------
-        */
-        if (in_array($user->role, ['super_admin', 'admin']) && $user->company_id === null && !$isImpersonating) {
-            $companies = Company::count();
-            $revenue = Invoice::withoutGlobalScope(CompanyScope::class)->where('status', 'paid')->sum('total');
-            $activeCompanies = Company::where('subscription_status', 'active')->count();
-            $recentInvoices = Invoice::withoutGlobalScope(CompanyScope::class)->latest()->take(5)->get();
-            $mrr = Company::where('subscription_status', 'active')->sum('monthly_price');
-
-            return view('admin.dashboard', compact('companies', 'revenue', 'activeCompanies', 'recentInvoices', 'greeting', 'mrr'));
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | 🏢 TENANT LEVEL (MCS, PP, etc.)
-        |--------------------------------------------------------------------------
-        */
-        $company = $user->company;
-        if (!$company) { abort(403, 'Company not found.'); }
-
-        // --- ROLE-BASED DASHBOARD SPLIT ---
+        // Force Houston Time for the greeting
+        date_default_timezone_set('America/Chicago');
+        $hour = date('H');
         
-        if ($user->role === 'staff') {
-            // Patty (Staff) lands here. NO REVENUE DATA.
-            $recentQuotes = Quote::where('company_id', $company->id)->latest()->take(5)->get();
-            return view('company.dashboards.staff', compact('greeting', 'company', 'recentQuotes'));
+        if ($hour < 12) {
+            $greeting = 'Good Morning';
+        } elseif ($hour < 17) {
+            $greeting = 'Good Afternoon';
+        } else {
+            $greeting = 'Good Evening';
         }
 
-        // Admins & Managers land here. FULL REVENUE DATA.
-        $revenue = Invoice::where('company_id', $company->id)->where('status', 'paid')->sum('total');
-        $invoicesCount = Invoice::where('company_id', $company->id)->count();
-        $paidInvoices = Invoice::where('company_id', $company->id)->where('status', 'paid')->count();
-        $pendingInvoices = Invoice::where('company_id', $company->id)->where('status', 'unpaid')->count();
-        $recentInvoices = Invoice::where('company_id', $company->id)->latest()->take(5)->get();
-        
-        $brandName = $company->name;
-        $revenueTrend = [];
-        for ($m = 1; $m <= 12; $m++) {
-            $revenueTrend[$m] = (float) Invoice::where('company_id', $company->id)
-                ->where('status', 'paid')
-                ->whereMonth('created_at', $m)
-                ->sum('total');
-        }
-
-        return view('dashboard', compact(
-            'revenue', 'invoicesCount', 'paidInvoices', 'pendingInvoices', 
-            'recentInvoices', 'brandName', 'greeting', 'revenueTrend'
-        ));
-    }
-
-    public function acceptLegal()
-    {
         $user = Auth::user();
-        $user->update(['legal_accepted_at' => now()]);
-        return redirect()->route('dashboard');
+        $company = $user->company;
+
+        if (!$company) {
+            return redirect('/login')->with('error', 'Company profile not found.');
+        }
+
+        // 1. Stripe Success Logic (Activation)
+        if ($request->has('session_id') && $company->subscription_status === 'pending') {
+            try {
+                Stripe::setApiKey(env('STRIPE_SECRET'));
+                $session = Session::retrieve($request->get('session_id'));
+                if ($session->payment_status === 'paid' || $session->payment_status === 'no_payment_required') {
+                    $company->update([
+                        'subscription_status' => 'trialing',
+                        'is_active' => true,
+                        'stripe_customer_id' => $session->customer,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \Log::error("Stripe Activation Error: " . $e->getMessage());
+            }
+        }
+
+        // 2. Stats Calculation
+        $stats = [
+            'total_revenue' => Invoice::where('company_id', $company->id)->where('status', 'paid')->sum('total'),
+            'total_invoices' => Invoice::where('company_id', $company->id)->count(),
+            'paid_invoices' => Invoice::where('company_id', $company->id)->where('status', 'paid')->count(),
+            'pending_invoices' => Invoice::where('company_id', $company->id)->where('status', 'pending')->count(),
+        ];
+
+        // 3. Graph Data (Monthly Revenue)
+        $chartData = array_fill(0, 12, 0);
+        try {
+            $monthlyRevenue = Invoice::where('company_id', $company->id)
+                ->where('status', 'paid')
+                ->whereYear('paid_at', date('Y'))
+                ->select(DB::raw('SUM(total) as aggregate'), DB::raw('MONTH(paid_at) as month'))
+                ->groupBy('month')
+                ->get();
+
+            foreach ($monthlyRevenue as $data) {
+                $chartData[$data->month - 1] = (float) $data->aggregate;
+            }
+        } catch (\Exception $e) {
+            \Log::error("Graph Data Error: " . $e->getMessage());
+        }
+
+        // 4. Recent Invoices
+        $recentInvoices = Invoice::where('company_id', $company->id)
+            ->latest()
+            ->take(5)
+            ->get();
+
+        $currentSecret = $company->stripe_secret_key ?? env('STRIPE_SECRET');
+        $stripeStatus = str_contains($currentSecret, 'sk_live') ? 'LIVE' : 'TEST';
+
+        return view('dashboard', compact('stats', 'chartData', 'recentInvoices', 'company', 'stripeStatus', 'greeting'));
     }
 }

@@ -29,12 +29,12 @@ class AppServiceProvider extends ServiceProvider
             $brandColor = '#6366f1';
 
             if (Auth::check()) {
-
                 $user = Auth::user();
 
-                if (!$user->is_admin && $user->company) {
-                    $brandName = $user->company->name;
-                    $brandLogo = $user->company->logo;
+                // SAFETY CHECK: Ensure company exists before accessing properties
+                if ($user && isset($user->company)) {
+                    $brandName = $user->company->name ?? 'Medios Billing';
+                    $brandLogo = $user->company->logo ?? null;
                     $brandColor = $user->company->primary_color ?? '#6366f1';
                 }
             }

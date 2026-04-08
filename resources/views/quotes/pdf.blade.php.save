@@ -1,0 +1,411 @@
+            font-size: 13px;
+            color: #dbeafe;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .content {
+            border: 1px solid #d1d5db;
+            border-top: none;
+            padding: 24px;
+        }
+
+        .top-info {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+        }
+
+        .top-info td {
+            border: none;
+            vertical-align: top;
+            padding: 0;
+        }
+
+        .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #64748b;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .customer-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #111827;
+            margin-bottom: 6px;
+        }
+
+        .muted {
+            color: #475569;
+            line-height: 1.55;
+            font-size: 12px;
+        }
+
+        .status-box {
+            text-align: right;
+        }
+
+        .status-pill {
+            display: inline-block;
+            padding: 5px 10px;
+            border: 1px solid #cbd5e1;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #1e293b;
+            margin-bottom: 10px;
+        }
+
+        .meta-line {
+            font-size: 12px;
+            color: #334155;
+            margin-bottom: 5px;
+        }
+
+        .items {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin-top: 10px;
+        }
+
+        .items th {
+            background: #f3f4f6;
+            color: #111827;
+            padding: 10px 8px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: bold;
+            border: 1px solid #e5e7eb;
+        }
+
+        .items td {
+            padding: 10px 8px;
+            border: 1px solid #e5e7eb;
+            vertical-align: top;
+        }
+
+        .col-service {
+            width: 58%;
+        }
+
+        .col-qty {
+            width: 10%;
+        }
+
+        .col-price {
+            width: 15%;
+        }
+
+        .col-total {
+            width: 17%;
+        }
+
+        .service-name {
+            font-weight: bold;
+            color: #111827;
+            font-size: 12px;
+            line-height: 1.4;
+            margin-bottom: 4px;
+            word-wrap: break-word;
+        }
+
+        .service-desc {
+            color: #6b7280;
+            font-size: 11px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .summary {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 24px;
+        }
+
+        .summary td {
+            border: none;
+            vertical-align: top;
+            padding: 0;
+        }
+
+        .terms-box {
+            border: 1px solid #e5e7eb;
+            background: #fafafa;
+            padding: 14px;
+            margin-right: 18px;
+        }
+
+        .terms-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #111827;
+            margin-bottom: 10px;
+        }
+
+        .terms-line {
+            font-size: 12px;
+            color: #374151;
+            margin-bottom: 7px;
+            line-height: 1.45;
+        }
+
+        .totals-box {
+            border: 1px solid #cbd5e1;
+        }
+
+        .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .totals-table td {
+            padding: 10px 12px;
+            border: none;
+        }
+
+        .totals-label {
+            color: #475569;
+            font-size: 12px;
+        }
+
+        .totals-value {
+            text-align: right;
+            font-size: 12px;
+            font-weight: bold;
+            color: #111827;
+        }
+
+        .grand-total-row td {
+            border-top: 1px solid #cbd5e1;
+            background: #eff6ff;
+        }
+
+        .grand-total-label {
+            font-size: 15px;
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+
+        .grand-total-value {
+            text-align: right;
+            font-size: 20px;
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+
+        .footer {
+            margin-top: 24px;
+            padding-top: 12px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            font-size: 11px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    @php
+        $displayQuoteNumber = $quote->quote_number ? ('#Q-' . substr($quote->quote_number, -6)) : ('#' . $quote->id);
+    @endphp
+
+    <div class="wrapper">
+        <div class="header">
+            <table class="header-table">
+                <tr>
+                    <td style="width: 68%;">
+                        @if(!empty($quote->company->logo_path))
+                            <img src="{{ public_path('storage/' . $quote->company->logo_path) }}" class="logo">
+                        @endif
+
+                        <div class="company-name">{{ $quote->company->name ?? 'Company Name' }}</div>
+                        <div class="company-subtitle">{{ $quote->title ?? 'Service Quote' }}</div>
+                    </td>
+                    <td style="width: 32%;">
+                        <div class="doc-type">Proposal</div>
+                        <div class="doc-number">{{ $displayQuoteNumber }}</div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="content">
+            <table class="top-info">
+                <tr>
+                    <td style="width: 62%;">
+                        <div class="label">Prepared For</div>
+                        <div class="customer-name">{{ $quote->customer->name ?? 'Customer Name' }}</div>
+
+                        <div class="muted">
+                            @if(!empty($quote->customer->email))
+                                {{ $quote->customer->email }}<br>
+                            @endif
+
+                            @if(!empty($quote->customer->phone))
+                                {{ $quote->customer->phone }}<br>
+                            @endif
+
+                            @if(!empty($quote->customer->address))
+                                {{ $quote->customer->address }}
+                            @endif
+                        </div>
+                    </td>
+
+                    <td style="width: 38%;" class="status-box">
+                        <div class="label">Status</div>
+                        <div class="status-pill">{{ $quote->status ?? 'draft' }}</div>
+
+                        <div class="meta-line">
+                            <strong>Created:</strong>
+                            {{ optional($quote->created_at)->format('M d, Y') }}
+                        </div>
+
+                        @if(!empty($quote->valid_until))
+                            <div class="meta-line">
+                                <strong>Valid Until:</strong>
+                                {{ \Carbon\Carbon::parse($quote->valid_until)->format('M d, Y') }}
+                            </div>
+                        @endif
+                    </td>
+                </tr>
+            </table>
+
+            <table class="items">
+                <thead>
+                    <tr>
+                        <th class="col-service">Service Description</th>
+                        <th class="col-qty text-center">Qty</th>
+                        <th class="col-price text-right">Price</th>
+                        <th class="col-total text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($quote->items as $item)
+                        <tr>
+                            <td class="col-service">
+                                <div class="service-name">{{ $item->service_name ?? 'Service Item' }}</div>
+                                @if(!empty($item->description))
+                                    <div class="service-desc">{{ $item->description }}</div>
+                                @endif
+                            </td>
+                            <td class="col-qty text-center">
+                                {{ rtrim(rtrim(number_format((float) ($item->quantity ?? 0), 2), '0'), '.') }}
+                            </td>
+                            <td class="col-price text-right">
+                                ${{ number_format((float) ($item->unit_price ?? 0), 2) }}
+                            </td>
+                            <td class="col-total text-right">
+                                <strong>${{ number_format((float) ($item->line_total ?? 0), 2) }}</strong>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="text-center" style="color:#6b7280;">No quote items found.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+
+            <table class="summary">
+                <tr>
+                    <td style="width: 58%;">
+                        <div class="terms-box">
+                            <div class="terms-title">Terms &amp; Conditions</div>
+                            <div class="terms-line">Valid for 30 days. Acceptance constitutes a binding agreement.</div>
+
+                            @if(($quote->deposit_type ?? 'none') === 'percentage')
+                                <div class="terms-line">
+                                    Deposit required: {{ number_format((float) ($quote->deposit_value ?? 0), 2) }}% (${{ number_format((float) ($quote->deposit_amount ?? 0), 2) }})
+                                </div>
+                                <div class="terms-line">
+                                    Remaining balance: ${{ number_format((float) ($quote->remaining_amount ?? 0), 2) }}
+                                </div>
+                            @elseif(($quote->deposit_type ?? 'none') === 'fixed')
+                                <div class="terms-line">
+                                    Deposit required: ${{ number_format((float) ($quote->deposit_amount ?? 0), 2) }}
+                                </div>
+                                <div class="terms-line">
+                                    Remaining balance: ${{ number_format((float) ($quote->remaining_amount ?? 0), 2) }}
+                                </div>
+                            @else
+                                <div class="terms-line">
+                                    Full amount due upon approval unless otherwise agreed.
+                                </div>
+                            @endif
+
+                            @if(!empty($quote->remaining_due_date))
+                                <div class="terms-line">
+                                    Remaining due date: {{ \Carbon\Carbon::parse($quote->remaining_due_date)->format('M d, Y') }}
+                                </div>
+                            @endif
+                        </div>
+                    </td>
+
+                    <td style="width: 42%;">
+                        <div class="totals-box">
+                            <table class="totals-table">
+                                <tr>
+                                    <td class="totals-label">Subtotal</td>
+                                    <td class="totals-value">${{ number_format((float) ($quote->subtotal ?? 0), 2) }}</td>
+                                </tr>
+
+                                @if((float) ($quote->discount ?? 0) > 0)
+                                    <tr>
+                                        <td class="totals-label">Discount</td>
+                                        <td class="totals-value">-${{ number_format((float) ($quote->discount ?? 0), 2) }}</td>
+                                    </tr>
+                                @endif
+
+                                @if((float) ($quote->tax ?? 0) > 0)
+                                    <tr>
+                                        <td class="totals-label">Tax</td>
+                                        <td class="totals-value">${{ number_format((float) ($quote->tax ?? 0), 2) }}</td>
+                                    </tr>
+                                @endif
+
+                                @if((float) ($quote->deposit_amount ?? 0) > 0)
+                                    <tr>
+                                        <td class="totals-label">Deposit Due</td>
+                                        <td class="totals-value">${{ number_format((float) ($quote->deposit_amount ?? 0), 2) }}</td>
+                                    </tr>
+                                @endif
+
+                                @if((float) ($quote->remaining_amount ?? 0) > 0 && ($quote->deposit_type ?? 'none') !== 'none')
+                                    <tr>
+                                        <td class="totals-label">Remaining Balance</td>
+                                        <td class="totals-value">${{ number_format((float) ($quote->remaining_amount ?? 0), 2) }}</td>
+                                    </tr>
+                                @endif
+
+                                <tr class="grand-total-row">
+                                    <td class="grand-total-label">Total</td>
+                                    <td class="grand-total-value">${{ number_format((float) ($quote->total ?? 0), 2) }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="footer">
+                {{ $quote->company->name ?? 'Company' }}
+                @if(!empty($quote->company->phone)) | {{ $quote->company->phone }} @endif
+                @if(!empty($quote->company->email)) | {{ $quote->company->email }} @endif
+                @if(!empty($quote->company->website)) | {{ $quote->company->website }} @endif
+            </div>
+        </div>
+    </div>
+</body>
+</html>

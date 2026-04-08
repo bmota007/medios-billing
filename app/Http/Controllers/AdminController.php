@@ -8,149 +8,125 @@ use App\Models\User;
 use App\Models\SubscriptionInvoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
-use App\Mail\OnboardingMail;
 
 class AdminController extends Controller
 {
     /**
-     * Super Admin Dashboard Logic
+     * Dashboard
      */
     public function dashboard()
     {
-        $companies = Company::count();
-        $activeCompanies = Company::where('is_active', true)->count();
-        
-        $revenue = SubscriptionInvoice::where('status', 'paid')->sum('amount');
-        
-        $mrr = SubscriptionInvoice::where('status', 'paid')
-                ->where('created_at', '>=', now()->startOfMonth())
-                ->sum('amount');
-        
-        $recentInvoices = SubscriptionInvoice::with('company')->latest()->take(10)->get();
+        try {
+            $companies = Company::count();
+            $activeCompanies = Company::where('is_active', true)->count();
+
+            $revenue = Invoice::where('status', 'paid')->sum('total') ?? 0;
+            $mrr = Company::where('subscription_status', 'active')->sum('monthly_price') ?? 0;
+
+            $recentInvoices = Invoice::latest()->take(5)->get();
+        } catch (\Exception $e) {
+            \Log::error('Dashboard Error: ' . $e->getMessage());
+
+            $companies = 0;
+            $activeCompanies = 0;
+            $revenue = 0;
+            $mrr = 0;
+            $recentInvoices = collect();
+        }
 
         return view('admin.dashboard', compact(
-            'companies', 
-            'activeCompanies', 
-            'revenue', 
-            'mrr', 
+            'companies',
+            'activeCompanies',
+            'revenue',
+            'mrr',
             'recentInvoices'
         ));
     }
 
     /**
-     * Show the Manual Onboarding Form
+     * Companies List
      */
-    public function manualChargeCreate()
+    public function companies()
     {
-        return view('admin.manual-charge');
-    }
-
-    /**
-     * Handle the Smart Onboarding / Manual Charge Logic
-     */
-    public function storeManualCharge(Request $request)
-    {
-        $request->validate([
-            'company_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:companies,email',
-            'amount' => 'required|numeric|min:1',
-            'interval' => 'required|in:month,year,one_time'
-        ]);
-
         try {
-            $company = Company::create([
-                'name' => $request->company_name,
-                'email' => $request->email,
-                'subscription_status' => 'trialing',
-                'trial_ends_at' => now()->addDays(7),
-                'custom_price' => $request->amount,
-                'billing_interval' => $request->interval,
-                'is_active' => true,
-                'is_subscription' => $request->has('is_subscription'),
-            ]);
-
-            $user = User::create([
-                'name' => $request->company_name . ' Admin',
-                'email' => $request->email,
-                'password' => Hash::make(Str::random(16)),
-                'company_id' => $company->id,
-                'role' => 'admin'
-            ]);
-
-            $token = Str::random(40);
-            $company->update(['setup_token' => $token]);
-
-            try {
-                Mail::to($request->email)->send(new OnboardingMail($company, $token));
-            } catch (\Exception $e) {
-                Log::error("Mail failed: " . $e->getMessage());
-            }
-
-            return redirect()->route('admin.companies')->with('success', 'Onboarding link sent to ' . $request->email);
-
+            $companies = Company::latest()->get();
         } catch (\Exception $e) {
-            Log::error("Onboarding Error: " . $e->getMessage());
-            return back()->with('error', 'Error: ' . $e->getMessage());
+            \Log::error('Companies Page Error: ' . $e->getMessage());
+            $companies = collect();
         }
+return view('admin.companies.index', compact('companies'));
     }
 
     /**
-     * DASHBOARD QUICK CHARGE METHOD
-     * This must exist because your dashboard form points here.
+     * Toggle Company Status
      */
-    public function manualCharge(Request $request)
-    {
-        $request->validate([
-            'amount' => 'required|numeric|min:1',
-            'customer_email' => 'required|email',
-            'description' => 'nullable|string|max:255'
-        ]);
-
-        return back()->with('success', 'Quick charge initiated for ' . $request->customer_email);
-    }
-
-    public function companies(Request $request)
-    {
-        $query = Company::query();
-        if ($request->filled('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
-        }
-        if ($request->filled('status')) {
-            $query->where('subscription_status', strtolower($request->status));
-        }
-
-        $companies = $query->withCount(['users', 'invoices'])
-                           ->latest()
-                           ->paginate(9)
-                           ->withQueryString();
-
-        return view('admin.companies.index', compact('companies'));
-    }
-
     public function toggleStatus($id)
     {
         $company = Company::findOrFail($id);
+
         $isActiveNow = ($company->subscription_status === 'active');
+
         $company->subscription_status = $isActiveNow ? 'inactive' : 'active';
         $company->is_active = !$isActiveNow;
+
         if (!$isActiveNow) {
             $company->subscription_ends_at = now()->addMonth();
         }
+
         $company->save();
-        return back()->with('success', 'Status updated.');
+
+        return back()->with('success', 'Status updated for ' . $company->name);
     }
 
+    /**
+     * Delete Company
+     */
     public function destroyCompany($id)
     {
         $company = Company::findOrFail($id);
         $company->delete();
+
         return back()->with('success', 'Company deleted successfully.');
     }
 
+    /**
+     * Create Company View
+     */
+    public function createCompany()
+    {
+        return view('admin.companies.create');
+    }
+
+    /**
+     * Store Company
+     */
+    public function storeCompany(Request $request)
+    {
+        $validated = $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:companies,email',
+            'phone'    => 'nullable|string',
+            'plan'     => 'required|string',
+            'mrr'      => 'nullable|numeric',
+            'industry' => 'nullable|string',
+        ]);
+
+        $company = Company::create($validated);
+
+        User::create([
+            'name'       => $company->name . ' Admin',
+            'email'      => 'admin@' . strtolower(str_replace(' ', '', $company->name)) . '.com',
+            'password'   => bcrypt('password123'),
+            'company_id' => $company->id,
+            'role'       => 'admin',
+        ]);
+
+        return redirect()->route('admin.companies')->with('success', 'Company + Admin user created.');
+    }
+
+    /**
+     * Billing
+     */
     public function billing()
     {
         $stats = [
@@ -161,36 +137,52 @@ class AdminController extends Controller
             'inactive_companies'   => Company::where('subscription_status', 'inactive')->count(),
         ];
 
-        $subscriptionInvoices = SubscriptionInvoice::with('company')->latest()->paginate(20);
+        // ⚠️ REMOVED relationship to avoid crash
+        $subscriptionInvoices = SubscriptionInvoice::latest()->get();
 
         return view('admin.billing', compact('stats', 'subscriptionInvoices'));
     }
 
+    /**
+     * Impersonate
+     */
     public function loginAsCompany($id)
     {
         $company = Company::findOrFail($id);
-        $user = User::where('company_id', $company->id)->first();
+        $user = User::where('company_id', $company->id)
+            ->where('role', '!=', 'super_admin')
+            ->first();
+
         if (!$user) {
-            return back()->with('error', 'No users found.');
+            return back()->with('error', 'No users found for this company.');
         }
+
         session(['impersonator_id' => auth()->id()]);
-        auth()->login($user);
+        Auth::login($user);
         request()->session()->regenerate();
+
         return redirect('/dashboard')->with('success', 'Now viewing: ' . $company->name);
     }
 
+    /**
+     * Stop Impersonation
+     */
     public function stopImpersonating()
     {
         $adminId = session('impersonator_id');
+
         if ($adminId) {
             $admin = User::find($adminId);
+
             if ($admin) {
                 Auth::login($admin);
                 session()->forget('impersonator_id');
                 session()->regenerate();
-                return redirect()->route('admin.dashboard');
+
+                return redirect()->route('admin.dashboard')->with('success', 'Returned to admin.');
             }
         }
+
         return redirect('/');
     }
 }

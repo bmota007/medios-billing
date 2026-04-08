@@ -143,7 +143,7 @@ class QuoteController extends Controller
             }
 
             return Invoice::create([
-                'company_id' => $quote->company_id,
+                'company_id' => $quote->company_id, // CRITICAL: Links to tenant
                 'customer_name' => $quote->customer->name ?? 'Customer',
                 'customer_email' => $quote->customer->email ?? '',
                 'invoice_no' => 'INV-' . strtoupper(Str::random(8)),

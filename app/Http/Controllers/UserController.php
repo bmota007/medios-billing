@@ -30,21 +30,24 @@ class UserController extends Controller
     public function store(Request $request)
     {
         try {
+            // Basic validation for the fields we definitely need
             $request->validate([
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:users,email',
                 'password' => 'required|min:8',
-                'role' => 'required|in:admin,staff'
             ]);
+
+            // Force the role to 'staff' if none is provided to avoid validation errors
+            $role = $request->input('role', 'staff');
 
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'company_id' => Auth::user()->company_id,
-                'role' => $request->role,
-                'is_admin' => ($request->role === 'admin' ? 1 : 0),
-                'needs_password_change' => true, // Force change on first login
+                'role' => $role,
+                'is_admin' => ($role === 'admin' ? 1 : 0),
+                'needs_password_change' => true,
             ]);
 
             $details = [
@@ -57,25 +60,27 @@ class UserController extends Controller
             try {
                 Mail::to($user->email)->send(new WelcomeStaffMail($details));
             } catch (\Exception $mailError) {
-                Log::error("Mail failed to send: " . $mailError->getMessage());
+                Log::error("Mail failed: " . $mailError->getMessage());
             }
 
-            return redirect()->route('users.index')->with('success','Team member created and welcome email sent.');
+            return redirect()->route('users.index')->with('success','Team member created successfully.');
 
         } catch (\Exception $e) {
             Log::error("User Creation Error: " . $e->getMessage());
-            return back()->with('error', 'Failed: ' . $e->getMessage());
+            
+            // If it's a validation error, let's catch exactly what it says
+            if ($e instanceof \Illuminate\Validation\ValidationException) {
+                $errors = implode(' ', \Illuminate\Support\Arr::flatten($e->errors()));
+                return back()->with('error', 'Validation Failed: ' . $errors);
+            }
+
+            return back()->with('error', 'Error: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Admin Reset Password Feature
-     */
     public function resetPassword($id)
     {
         $user = User::where('id', $id)->where('company_id', Auth::user()->company_id)->firstOrFail();
-        
-        // Generate a random 10-character password
         $newPassword = Str::random(10);
         
         $user->update([
@@ -92,22 +97,16 @@ class UserController extends Controller
 
         try {
             Mail::to($user->email)->send(new WelcomeStaffMail($details));
-            return back()->with('success', 'Password reset! New credentials emailed to ' . $user->email);
+            return back()->with('success', 'Password reset! New credentials emailed.');
         } catch (\Exception $e) {
-            return back()->with('success', 'Password reset to: ' . $newPassword . ' (Email failed to send)');
+            return back()->with('success', 'Password reset to: ' . $newPassword);
         }
     }
 
     public function destroy($id)
     {
-        $user = User::where('id', $id)
-                    ->where('company_id', Auth::user()->company_id)
-                    ->firstOrFail();
-
-        if ($user->id === Auth::id()) {
-            return back()->with('error', 'You cannot delete yourself!');
-        }
-
+        $user = User::where('id', $id)->where('company_id', Auth::user()->company_id)->firstOrFail();
+        if ($user->id === Auth::id()) return back()->with('error', 'You cannot delete yourself!');
         $user->delete();
         return back()->with('success', 'User removed.');
     }

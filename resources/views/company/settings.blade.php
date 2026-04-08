@@ -1,173 +1,277 @@
-@extends('layouts.admin')
+id="clean_pro_ui" variant="standard"
+@extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
-    <div class="mb-4">
-        <h2 class="text-white fw-bold">{{ $company->name }} Settings</h2>
-        <p class="text-secondary small">Update your business profile, branding, contract, and payment methods in one place.</p>
+
+<div class="wrap">
+
+    <div class="header">
+        <h1>{{ $company->name }} Settings</h1>
+        <p>Manage branding, payments, contract, and system configuration.</p>
     </div>
 
-    @if(session('success'))
-        <div class="alert alert-success bg-green-500/10 border-green-500/20 text-green-500 mb-4">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="alert alert-danger bg-red-500/10 border-red-500/20 text-red-500 mb-4">
-            {{ session('error') }}
-        </div>
-    @endif
-
-    <form method="POST" action="{{ route('company.update') }}" enctype="multipart/form-data">
+    <form method="POST" enctype="multipart/form-data">
         @csrf
-        <div class="row">
-            <div class="col-md-7">
-                <div class="glass-card mb-4">
-                    <h5 class="text-white mb-4">Business Profile</h5>
-                    
-                    <div class="mb-3">
-                        <label class="text-secondary small uppercase">Company Name</label>
-                        <input type="text" name="name" value="{{ $company->name }}" class="form-control bg-transparent border-slate-700 text-white">
-                    </div>
 
-                    <div class="mb-3">
-                        <label class="text-secondary small uppercase">Company Email</label>
-                        <input type="email" name="email" value="{{ $company->email }}" class="form-control bg-transparent border-slate-700 text-white">
-                    </div>
+        <div class="grid">
 
-                    <div class="mb-3">
-                        <label class="text-secondary small uppercase">Phone</label>
-                        <input type="text" name="phone" value="{{ $company->phone }}" class="form-control bg-transparent border-slate-700 text-white">
-                    </div>
+            {{-- LEFT --}}
+            <div>
 
-                    <div class="mb-3">
-                        <label class="text-secondary small uppercase">Business Address</label>
-                        <input type="text" name="address" value="{{ $company->address }}" class="form-control bg-transparent border-slate-700 text-white">
-                    </div>
+                {{-- BUSINESS --}}
+                <div class="card">
+                    <h3>Business Profile</h3>
 
-                    <div class="mb-3">
-                        <label class="text-secondary small uppercase">Website</label>
-                        <input type="text" name="website" value="{{ $company->website }}" class="form-control bg-transparent border-slate-700 text-white">
-                    </div>
+                    <input type="text" name="name" value="{{ $company->name }}" placeholder="Company Name">
+                    <input type="email" name="email" value="{{ $company->email }}" placeholder="Company Email">
+                    <input type="text" name="phone" value="{{ $company->phone }}" placeholder="Phone">
+                    <input type="text" name="address" value="{{ $company->address }}" placeholder="Address">
+                    <input type="text" name="website" value="{{ $company->website }}" placeholder="Website">
 
-                    <div class="mb-3">
-                        <label class="text-secondary small uppercase">Primary Brand Color</label>
-                        <input type="text" name="primary_color" value="{{ $company->primary_color }}" class="form-control bg-transparent border-slate-700 text-white">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="text-secondary small uppercase d-block">Logo</label>
-                        @if($company->logo_path)
-                            <div class="mb-3 p-2 bg-slate-800/50 rounded inline-block">
-                                <img src="{{ asset('storage/'.$company->logo_path) }}" 
-                                     alt="Logo" 
-                                     style="max-height: 120px; width: auto; display: block;" 
-                                     class="rounded">
-                            </div>
-                        @endif
-                        <input type="file" name="logo" class="form-control bg-transparent border-slate-700 text-white">
-                        <small class="text-secondary small">Accepted: JPG, JPEG, PNG, SVG, WEBP (Max 2MB)</small>
+                    <div class="color-row">
+                        <input type="text" name="primary_color" value="{{ $company->primary_color }}">
+                        <div class="color-preview" style="background: {{ $company->primary_color }}"></div>
                     </div>
                 </div>
 
-                <div class="glass-card mb-4">
-                    <h5 class="text-white mb-3">Contract Template</h5>
+                {{-- STRIPE --}}
+                <div class="card highlight">
+                    <h3>Stripe Payment Integration</h3>
+
+                    <select name="stripe_mode">
+                        <option value="live" {{ $company->stripe_mode=='live'?'selected':'' }}>🚀 Live Mode</option>
+                        <option value="test" {{ $company->stripe_mode=='test'?'selected':'' }}>🧪 Test Mode</option>
+                    </select>
+
+                    <div class="two-col">
+                        <input type="text" name="stripe_publishable_key" value="{{ $company->stripe_publishable_key }}" placeholder="Live Publishable Key">
+                        <input type="password" name="stripe_secret_key" placeholder="Live Secret Key">
+                    </div>
+
+                    <div class="two-col">
+                        <input type="text" name="stripe_test_publishable_key" value="{{ $company->stripe_test_publishable_key }}" placeholder="Test Publishable Key">
+                        <input type="password" name="stripe_test_secret_key" placeholder="Test Secret Key">
+                    </div>
+
+                    <input type="password" name="stripe_webhook_secret" placeholder="Stripe Webhook Secret (WHSEC)">
+                </div>
+
+                {{-- CONTRACT --}}
+                <div class="card">
+                    <h3>Contract Template</h3>
+
                     @if($company->contract_template_path)
-                        <a href="{{ Storage::url($company->contract_template_path) }}" target="_blank" class="btn btn-sm btn-outline-secondary mb-3">View Current Contract</a>
+                        <a href="{{ asset('storage/'.$company->contract_template_path) }}" target="_blank" class="btn-small">
+                            View Contract
+                        </a>
                     @endif
-                    <input type="file" name="contract_template" class="form-control bg-transparent border-slate-700 text-white">
-                    <small class="text-secondary small">Accepted: PDF, DOC, DOCX, TXT (Max 10MB)</small>
+
+                    <input type="file" name="contract_template">
                 </div>
 
-                <div class="glass-card mb-4">
-                    <h5 class="text-white mb-3">Accepted Payment Methods</h5>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="accept_card" value="1" {{ $company->accept_card ? 'checked' : '' }}><label class="form-check-label text-white small">Accept Card</label></div>
-                            <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="accept_cash" value="1" {{ $company->accept_cash ? 'checked' : '' }}><label class="form-check-label text-white small">Accept Cash</label></div>
-                            <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="accept_venmo" value="1" {{ $company->accept_venmo ? 'checked' : '' }}><label class="form-check-label text-white small">Accept Venmo</label></div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="accept_check" value="1" {{ $company->accept_check ? 'checked' : '' }}><label class="form-check-label text-white small">Accept Check</label></div>
-                            <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="accept_zelle" value="1" {{ $company->accept_zelle ? 'checked' : '' }}><label class="form-check-label text-white small">Accept Zelle</label></div>
-                        </div>
-                    </div>
+                {{-- PAYMENTS --}}
+                <div class="card">
+                    <h3>Payment Methods</h3>
 
-                    <div class="mt-4">
-                        <label class="text-secondary small uppercase">Zelle Label</label>
-                        <input type="text" name="zelle_label" value="{{ $company->zelle_label }}" class="form-control bg-transparent border-slate-700 text-white mb-2">
-                        <label class="text-secondary small uppercase">Zelle Value</label>
-                        <input type="text" name="zelle_value" value="{{ $company->zelle_value }}" class="form-control bg-transparent border-slate-700 text-white mb-3">
-                        
-                        <label class="text-secondary small uppercase">Venmo Label</label>
-                        <input type="text" name="venmo_label" value="{{ $company->venmo_label }}" class="form-control bg-transparent border-slate-700 text-white mb-2">
-                        <label class="text-secondary small uppercase">Venmo Value</label>
-                        <input type="text" name="venmo_value" value="{{ $company->venmo_value }}" class="form-control bg-transparent border-slate-700 text-white">
+                    <div class="toggle-grid">
+                        @foreach([
+                            'card'=>'Card',
+                            'cash'=>'Cash',
+                            'venmo'=>'Venmo',
+                            'check'=>'Check',
+                            'zelle'=>'Zelle'
+                        ] as $key=>$label)
+
+                        <label class="toggle">
+                            <input type="checkbox" name="accept_{{ $key }}" {{ $company->{'accept_'.$key} ? 'checked':'' }}>
+                            <span>{{ $label }}</span>
+                        </label>
+
+                        @endforeach
                     </div>
                 </div>
 
-                <div class="glass-card mb-4 border border-slate-700/50">
-                    <h5 class="text-white mb-2"><i class="fa-solid fa-credit-card mr-2"></i> Stripe Payment Integration</h5>
-                    <p class="text-secondary small mb-4">Connect your own Stripe account to receive customer payments directly.</p>
-                    
-                    <div class="mb-4">
-                        <label class="text-secondary small uppercase">Transaction Mode</label>
-                        <select name="stripe_mode" class="form-control bg-transparent border-slate-700 text-white">
-                            <option value="test" {{ $company->stripe_mode == 'test' ? 'selected' : '' }} class="bg-slate-900">🛠 Test Mode (Sandbox)</option>
-                            <option value="live" {{ $company->stripe_mode == 'live' ? 'selected' : '' }} class="bg-slate-900">🚀 Live Mode</option>
-                        </select>
-                    </div>
+                <button class="btn-save">Save Settings</button>
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="text-warning small uppercase font-bold">Live Publishable Key</label>
-                            <input type="text" name="stripe_publishable_key" value="{{ $company->stripe_publishable_key }}" class="form-control bg-transparent border-slate-700 text-white" placeholder="pk_live_...">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="text-warning small uppercase font-bold">Live Secret Key</label>
-                            <input type="password" name="stripe_secret_key" value="{{ $company->stripe_secret_key }}" class="form-control bg-transparent border-slate-700 text-white" placeholder="sk_live_...">
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="text-secondary small uppercase">Test Publishable Key</label>
-                            <input type="text" name="stripe_test_publishable_key" value="{{ $company->stripe_test_publishable_key }}" class="form-control bg-transparent border-slate-700 text-white" placeholder="pk_test_...">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="text-secondary small uppercase">Test Secret Key</label>
-                            <input type="password" name="stripe_test_secret_key" value="{{ $company->stripe_test_secret_key }}" class="form-control bg-transparent border-slate-700 text-white" placeholder="sk_test_...">
-                        </div>
-                    </div>
-
-                    <div class="row mt-3">
-                        <div class="col-md-12 mb-3">
-                            <label class="text-warning small uppercase fw-bold mb-2 d-block">Stripe Webhook Secret (WHSEC)</label>
-                            <input type="password" name="stripe_webhook_secret" value="{{ $company->stripe_webhook_secret }}" class="form-control bg-transparent border-slate-700 text-white" placeholder="whsec_...">
-                            <small class="text-secondary small">Get this from Stripe -> Developers -> Webhooks</small>
-                        </div>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn btn-primary btn-sm px-4">Save Business Settings</button>
             </div>
 
-            <div class="col-md-5">
-                <div class="glass-card h-100">
-                    <h5 class="text-white mb-4">Change Password</h5>
-                    <div class="mb-3">
-                        <label class="text-secondary small uppercase">New Password</label>
-                        <input type="password" name="password" class="form-control bg-transparent border-slate-700 text-white" placeholder="New password">
-                    </div>
-                    <div class="mb-3">
-                        <label class="text-secondary small uppercase">Confirm New Password</label>
-                        <input type="password" name="password_confirmation" class="form-control bg-transparent border-slate-700 text-white" placeholder="Confirm password">
-                    </div>
-                    <button type="submit" class="btn btn-warning w-100 font-bold uppercase">Update Password</button>
+            {{-- RIGHT --}}
+            <div>
+
+                {{-- PASSWORD --}}
+                <div class="card">
+                    <h3>Change Password</h3>
+
+                    <input type="password" name="password" placeholder="New Password">
+                    <input type="password" name="password_confirmation" placeholder="Confirm Password">
+
+                    <button class="btn-yellow">Update Password</button>
                 </div>
+
+                {{-- LOGO --}}
+                <div class="card center">
+                    <h3>Brand Logo</h3>
+
+                    @if($company->logo_path)
+                        <img src="{{ asset('storage/'.$company->logo_path) }}" class="logo-preview">
+                    @endif
+
+                    <input type="file" name="logo">
+                </div>
+
+                {{-- SMTP --}}
+                <div class="card highlight-blue">
+                    <h3>SMTP Email Setup</h3>
+
+                    <input type="text" name="smtp_host" value="{{ $company->smtp_host }}" placeholder="SMTP Host">
+                    <input type="text" name="smtp_port" value="{{ $company->smtp_port }}" placeholder="Port">
+                    <input type="text" name="smtp_user" value="{{ $company->smtp_user }}" placeholder="Email Username">
+                    <input type="password" name="smtp_pass" placeholder="Email Password">
+                    <input type="text" name="smtp_from" value="{{ $company->smtp_from }}" placeholder="From Email">
+
+                    <small>This allows each business to send invoices from their own email</small>
+
+                    <button type="submit" formaction="{{ route('smtp.test') }}" class="btn-test">
+                        Send Test Email
+                    </button>
+                </div>
+
             </div>
+
         </div>
+
     </form>
+
 </div>
+
+<style>
+
+body{
+background: radial-gradient(circle at top, #0f172a, #020617);
+}
+
+.wrap{max-width:1300px;margin:auto;padding:30px}
+
+.header h1{color:#fff;font-size:2rem;font-weight:800}
+.header p{color:#94a3b8}
+
+.grid{
+display:grid;
+grid-template-columns:2fr 1fr;
+gap:30px;
+align-items:start;
+}
+
+.card{
+background:rgba(15,23,42,.85);
+border-radius:18px;
+padding:22px;
+margin-bottom:22px;
+border:1px solid rgba(255,255,255,.08);
+transition:.2s;
+}
+
+.card:hover{
+transform:translateY(-2px);
+box-shadow:0 10px 30px rgba(14,165,233,.15);
+}
+
+.card h3{
+color:#fff;
+font-weight:700;
+margin-bottom:15px;
+}
+
+input,select{
+width:100%;
+padding:13px;
+margin-bottom:12px;
+border-radius:10px;
+border:none;
+background:#e2e8f0;
+color:#111;
+}
+
+.two-col{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px;
+}
+
+.color-row{
+display:flex;
+gap:10px;
+}
+
+.color-preview{
+width:50px;
+border-radius:10px;
+}
+
+.toggle{
+display:flex;
+justify-content:space-between;
+align-items:center;
+background:#020617;
+padding:12px;
+border-radius:10px;
+color:#fff;
+}
+
+.toggle input{
+width:auto;
+}
+
+.toggle-grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px;
+}
+
+.btn-yellow{
+width:100%;
+background:#fbbf24;
+padding:12px;
+border:none;
+border-radius:10px;
+font-weight:bold;
+color:#000;
+}
+
+.btn-save{
+width:100%;
+padding:16px;
+background:linear-gradient(90deg,#0ea5e9,#22c55e);
+border:none;
+border-radius:12px;
+color:#fff;
+font-weight:bold;
+margin-top:20px;
+}
+
+.btn-test{
+width:100%;
+margin-top:10px;
+padding:12px;
+background:#22c55e;
+border:none;
+border-radius:10px;
+color:#fff;
+font-weight:bold;
+}
+
+.logo-preview{
+max-width:150px;
+margin-bottom:15px;
+}
+
+.center{text-align:center}
+
+@media(max-width:900px){
+.grid{grid-template-columns:1fr}
+.two-col{grid-template-columns:1fr}
+}
+
+</style>
+
 @endsection

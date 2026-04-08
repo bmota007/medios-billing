@@ -12,30 +12,30 @@ class CheckSubscription
     {
         $user = Auth::user();
 
-        // 1. Let Super Admin pass always
-        if ($user->role === 'super_admin') {
+        // 1. Bypass for Super Admins
+        if ($user && $user->role === 'super_admin') {
             return $next($request);
+        }
+
+        if (!$user || !$user->company) {
+            return redirect()->route('login');
         }
 
         $company = $user->company;
 
-        /**
-         * 2. SOFTEN THE BOUNCER
-         * We REMOVE the "force to subscribe" if no card is on file.
-         * Now, they can access the Dashboard, but we still protect 
-         * sensitive routes like 'invoices/create' if you want.
-         */
-        
-        // Example: Only force subscription if they try to CREATE an invoice
-        /*
-        if (!$company->stripe_payment_method_id && $request->is('invoices/create')) {
-             return redirect()->route('subscribe')->with('info', 'Please activate your 7-day trial to create invoices.');
+        // 2. Bypass for System Accounts (Medios Billing)
+        if ($company->plan === 'SYSTEM') {
+            return $next($request);
         }
-        */
 
-        // 3. Keep the "Hard Lock" for non-payment (After the 7 days/failed bill)
-        if (!$company->is_active && !$request->is('billing-locked') && !$request->is('subscribe*') && !$request->is('logout')) {
-            return redirect()->route('billing.locked');
+        // Settings, Profile, and Logout are always allowed
+        if ($request->is('company/settings*') || $request->is('logout') || $request->is('profile*')) {
+            return $next($request);
+        }
+
+        // 3. Active check for standard Tenants
+        if (!$company->is_active && $company->subscription_status !== 'trialing') {
+            return redirect()->route('company.settings')->with('warning', 'Please activate your plan.');
         }
 
         return $next($request);

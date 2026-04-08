@@ -1,187 +1,722 @@
-@extends('layouts.admin')
+@extends('layouts.app')
 
 @section('content')
-<style>
-    /* Visibility Fix for Glass Theme */
-    .form-control, .form-select {
-        color: #ffffff !important; 
-        background-color: rgba(15, 23, 42, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    }
 
-    /* FIX: This makes the calendar/date icon white */
-    input[type="date"]::-webkit-calendar-picker-indicator {
-        filter: invert(1);
-        cursor: pointer;
-    }
+<div class="invoice-wrapper">
 
-    .form-select option {
-        background-color: #1e293b;
-        color: white;
-    }
-    .form-control::placeholder {
-        color: rgba(255, 255, 255, 0.4);
-    }
-    .text-label {
-        color: #94a3b8;
-        font-size: 0.85rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.025em;
-    }
-</style>
-
-<div class="container-fluid">
-    <div class="mb-5">
-        <h2 class="text-white font-bold">Create <span class="text-sky-400">Invoice</span></h2>
-        <p class="text-secondary small">Generate a professional billing document for your client</p>
+    <div class="header">
+        <h1>Create Invoice</h1>
+        <p>Professional billing with real-time preview, deposit tracking, and remaining balance scheduling</p>
     </div>
 
-    <form method="POST" action="{{ route('invoice.send') }}">
+    <form action="{{ route('invoice.send') }}" method="POST">
         @csrf
-        <div class="row g-4">
-            <div class="col-md-4">
-                <div class="glass-card h-100">
-                    <h5 class="text-white mb-4"><i class="fa-solid fa-user-tag text-sky-400 mr-2"></i> Client Info</h5>
 
-                    <div class="mb-4">
-                        <label class="text-label">Select Customer</label>
-                        <select id="customer_select" name="customer_id" class="form-control mt-2">
-                            <option value="">-- Choose --</option>
-                            @foreach($customers as $customer)
-                                <option value="{{ $customer->id }}" 
-                                    data-name="{{ $customer->name }}" 
-                                    data-email="{{ $customer->email }}"
-                                    data-street="{{ $customer->billing_address }}"
-                                    data-city="{{ $customer->city }}"
-                                    data-state="{{ $customer->state }}"
-                                    data-zip="{{ $customer->zip }}">
-                                    {{ $customer->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+        <input type="hidden" name="deposit_amount" id="deposit_amount_input">
+        <input type="hidden" name="remaining_balance" id="remaining_balance_input">
+        <input type="hidden" name="tax_amount" id="tax_amount_input">
+        <input type="hidden" name="grand_total" id="grand_total_input">
+        <input type="hidden" name="subtotal_amount" id="subtotal_amount_input">
 
-                    <input type="hidden" name="customer_name">
-                    <input type="hidden" name="customer_email">
-                    <input type="hidden" name="street_address">
-                    <input type="hidden" name="city_state_zip">
+        <div class="grid">
 
-                    <div class="mb-4">
-                        <label class="text-label">Issue Date</label>
-                        <input type="date" name="invoice_date" class="form-control mt-2" value="{{ date('Y-m-d') }}">
-                    </div>
+            {{-- LEFT SIDE --}}
+            <div class="left">
 
-                    <div class="mb-4">
-                        <label class="text-label">Due Date</label>
-                        <input type="date" name="due_date" class="form-control mt-2" required>
-                    </div>
+                <div class="card">
+                    <h3>Client Info</h3>
 
-                    @if(auth()->user()->role == 'super_admin')
-                    <div class="p-3 rounded bg-sky-500/10 border border-sky-500/20 mt-4">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" name="is_subscription" value="1" id="isSub">
-                            <label class="form-check-label text-white font-bold small" for="isSub">
-                                MARK AS SaaS SUBSCRIPTION
-                            </label>
+                    <label class="field-label">Select Customer</label>
+                    <select id="customer_id">
+                        <option value="">-- Select Customer --</option>
+                        @foreach($customers as $c)
+                            <option value="{{ $c->id }}"
+                                data-name="{{ e($c->name) }}"
+                                data-email="{{ e($c->email ?? '') }}"
+                                data-phone="{{ e($c->phone ?? '') }}">
+                                {{ $c->name }}
+                            </option>
+                        @endforeach
+                    </select>
+
+                    <label class="field-label">Customer Name</label>
+                    <input id="customer_name" name="customer_name" placeholder="Customer Name" required>
+
+                    <label class="field-label">Email</label>
+                    <input id="customer_email" name="customer_email" placeholder="Email" required>
+
+                    <label class="field-label">Phone</label>
+                    <input id="customer_phone" name="customer_phone" placeholder="Phone">
+                </div>
+
+                <div class="card">
+                    <h3>Invoice Schedule</h3>
+
+                    <div class="two-col">
+                        <div>
+                            <label class="field-label">Invoice Date</label>
+                            <input type="date" name="invoice_date" id="invoice_date" value="{{ now()->format('Y-m-d') }}">
+                        </div>
+
+                        <div>
+                            <label class="field-label">Deposit Due Date</label>
+                            <input type="date" name="due_date" id="due_date" value="{{ now()->format('Y-m-d') }}">
                         </div>
                     </div>
-                    @endif
+
+                    <div style="margin-top: 12px;">
+                        <label class="field-label">Remaining Balance Due Date</label>
+                        <input type="date" name="remaining_due_date" id="remaining_due_date">
+                    </div>
+
+                    <div class="schedule-note">
+                        The customer will see both the deposit due date and the remaining balance due date on the invoice preview.
+                    </div>
                 </div>
-            </div>
 
-            <div class="col-md-8">
-                <div class="glass-card">
-                    <h5 class="text-white mb-4"><i class="fa-solid fa-list text-sky-400 mr-2"></i> Services & Items</h5>
-                    
-                    <table class="table table-dark border-transparent" id="items">
-                        <thead class="text-secondary small uppercase">
-                            <tr>
-                                <th width="60%">Description</th>
-                                <th>Qty</th>
-                                <th>Price</th>
-                                <th class="text-end">Total</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><input name="items[0][desc]" class="form-control bg-transparent border-slate-700 text-white" placeholder="Service name..." required></td>
-                                <td><input type="number" name="items[0][qty]" class="form-control bg-transparent border-slate-700 text-white qty" value="1"></td>
-                                <td><input type="number" name="items[0][price]" class="form-control bg-transparent border-slate-700 text-white price" placeholder="0.00" step="0.01"></td>
-                                <td class="text-end text-white font-bold pt-3 lineTotal">$0.00</td>
-                                <td></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="card">
+                    <h3>Services & Items</h3>
 
-                    {{-- FIXED: Button visibility improved with Sky Blue --}}
-<button type="button" class="btn text-white opacity-100 font-bold small p-0 mt-3" onclick="addRow()">
-    <i class="fa-solid fa-plus-circle me-1 text-sky-400"></i> Add Line Item
-</button>
+                    <div class="thead">
+                        <span>Description</span>
+                        <span>Qty</span>
+                        <span>Price</span>
+                        <span>Total</span>
+                        <span></span>
+                    </div>
+
+                    <div id="items"></div>
+
+                    <button type="button" onclick="addItem()" class="btn-add">
+                        + Add Line Item
                     </button>
+                </div>
 
-                    <div class="row justify-content-end mt-5">
-                        <div class="col-md-5">
-                            <div class="d-flex justify-content-between mb-3">
-                                <span class="text-secondary small uppercase">Grand Total</span>
-                                <span class="text-sky-400 text-2xl font-bold font-mono">$<span id="grandTotal">0.00</span></span>
-                            </div>
-                            <button class="btn btn-primary w-100 py-3 font-bold" type="submit">
-                                PREVIEW & GENERATE
-                            </button>
+            </div>
+
+            {{-- RIGHT SIDE --}}
+            <div class="right">
+
+                <div class="preview-card">
+
+                    <div class="preview-header">
+                        @if(!empty($company->logo_path))
+                            <img src="{{ asset('storage/' . $company->logo_path) }}" class="logo" alt="Logo">
+                        @endif
+                        <div>
+                            <h2 style="color:{{ $company->primary_color ?? '#0ea5e9' }}">{{ $company->name }}</h2>
+                            <p class="preview-subtitle">Invoice Preview</p>
                         </div>
                     </div>
+
+                    <div class="preview-client">
+                        <div>
+                            <small>Billed To</small>
+                            <strong id="preview_name">Customer</strong><br>
+                            <span id="preview_email"></span>
+                        </div>
+                    </div>
+
+                    <div class="preview-schedule">
+                        <div class="schedule-pill">
+                            <small>Deposit Due</small>
+                            <strong id="preview_due_date">—</strong>
+                        </div>
+                        <div class="schedule-pill">
+                            <small>Remaining Due</small>
+                            <strong id="preview_remaining_due_date">—</strong>
+                        </div>
+                    </div>
+
+                    <div class="preview-items-wrap">
+                        <div class="preview-items-head">
+                            <span>Item</span>
+                            <span>Total</span>
+                        </div>
+                        <div class="preview-items" id="preview_items"></div>
+                    </div>
+
+                    <div class="preview-totals">
+
+                        <div class="total-row">
+                            <span>Subtotal</span>
+                            <span id="subtotal">$0.00</span>
+                        </div>
+
+                        <div class="tax-row">
+                            <label for="tax_percent">Tax (%)</label>
+                            <input
+                                id="tax_percent"
+                                type="number"
+                                value="0"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                inputmode="decimal"
+                            >
+                        </div>
+
+                        <div class="total-row">
+                            <span>Tax</span>
+                            <span id="tax">$0.00</span>
+                        </div>
+
+                        <div class="total-row grand">
+                            <span>Total</span>
+                            <span id="grand">$0.00</span>
+                        </div>
+
+                        <div class="deposit-box">
+                            <div class="deposit-head">
+                                <span>Deposit Setup</span>
+                                <input
+                                    type="number"
+                                    id="deposit_percent"
+                                    name="deposit_percent"
+                                    value="35"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    inputmode="decimal"
+                                >
+                            </div>
+
+                            <div class="deposit-split">
+                                <div class="money-card">
+                                    <small>Deposit Due Now</small>
+                                    <strong id="deposit_amount">$0.00</strong>
+                                    <span class="money-note" id="deposit_due_note">Due on —</span>
+                                </div>
+
+                                <div class="money-card">
+                                    <small>Remaining Balance</small>
+                                    <strong id="remaining_amount">$0.00</strong>
+                                    <span class="money-note" id="remaining_due_note">Due on —</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <button class="btn-primary">Generate Invoice</button>
+
                 </div>
+
             </div>
+
         </div>
     </form>
 </div>
 
+<style>
+.invoice-wrapper{max-width:1360px;margin:auto;padding:34px}
+.header h1{color:#fff;font-size:42px;font-weight:800;line-height:1.05;margin:0 0 8px}
+.header p{color:#94a3b8;margin:0 0 26px;font-size:17px}
+
+.grid{display:grid;grid-template-columns:1.08fr 1fr;gap:30px;align-items:start}
+.left,.right{min-width:0}
+
+.card{
+    background:rgba(15,23,42,.78);
+    padding:24px;
+    border-radius:20px;
+    margin-bottom:22px;
+    border:1px solid rgba(255,255,255,.06);
+    box-shadow:0 18px 40px rgba(0,0,0,.28);
+}
+
+.preview-card{
+    background:linear-gradient(145deg,#020617,#0f172a);
+    padding:26px;
+    border-radius:24px;
+    box-shadow:0 24px 50px rgba(0,0,0,.55);
+    border:1px solid rgba(255,255,255,.06);
+    position:sticky;
+    top:28px;
+}
+
+.card h3,.preview-card h2{
+    margin:0 0 16px;
+    color:#fff;
+    font-weight:800;
+}
+
+.preview-subtitle{
+    color:#94a3b8;
+    margin:2px 0 0;
+    font-size:14px;
+}
+
+.logo{
+    max-width:84px;
+    max-height:84px;
+    object-fit:contain;
+    margin-right:14px;
+}
+
+.preview-header{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:24px;
+}
+
+.field-label{
+    display:block;
+    color:#94a3b8;
+    font-size:13px;
+    font-weight:700;
+    margin:10px 0 6px;
+    letter-spacing:.02em;
+}
+
+input,select{
+    width:100%;
+    padding:14px 14px;
+    border-radius:12px;
+    background:#111c33;
+    color:#fff;
+    border:1px solid rgba(255,255,255,.08);
+    outline:none;
+    font-size:16px;
+    box-sizing:border-box;
+}
+
+input:focus,select:focus{
+    border-color:rgba(59,130,246,.7);
+    box-shadow:0 0 0 3px rgba(59,130,246,.16);
+}
+
+.two-col{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+}
+
+.schedule-note{
+    margin-top:14px;
+    color:#94a3b8;
+    font-size:13px;
+    line-height:1.45;
+    background:rgba(14,165,233,.08);
+    border:1px solid rgba(14,165,233,.16);
+    padding:12px 14px;
+    border-radius:12px;
+}
+
+.thead,.row{
+    display:grid;
+    grid-template-columns:2.2fr .8fr 1fr 1fr 48px;
+    gap:12px;
+    align-items:center;
+}
+
+.thead{
+    color:#94a3b8;
+    margin-top:4px;
+    margin-bottom:10px;
+    font-size:13px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+}
+
+.row{
+    margin-top:12px;
+}
+
+.row input{
+    margin:0;
+}
+
+.line-total{
+    background:#111c33;
+    border:1px solid rgba(255,255,255,.08);
+    color:#fff;
+    border-radius:12px;
+    padding:14px;
+    min-height:50px;
+    display:flex;
+    align-items:center;
+    font-weight:700;
+}
+
+.remove{
+    background:#ef4444;
+    border:none;
+    color:#fff;
+    border-radius:12px;
+    cursor:pointer;
+    height:50px;
+    font-size:18px;
+    font-weight:800;
+}
+
+.btn-add{
+    margin-top:16px;
+    background:linear-gradient(135deg,#0ea5e9,#3b82f6);
+    padding:12px 16px;
+    border:none;
+    border-radius:12px;
+    color:#fff;
+    font-weight:700;
+    cursor:pointer;
+}
+
+.preview-client{
+    background:rgba(255,255,255,.03);
+    border:1px solid rgba(255,255,255,.05);
+    border-radius:16px;
+    padding:16px;
+    margin-bottom:18px;
+    color:#fff;
+}
+
+.preview-client small{
+    display:block;
+    color:#94a3b8;
+    margin-bottom:6px;
+    text-transform:uppercase;
+    font-size:11px;
+    letter-spacing:.05em;
+}
+
+.preview-client strong{
+    font-size:24px;
+}
+
+.preview-client span{
+    color:#cbd5e1;
+}
+
+.preview-schedule{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-bottom:18px;
+}
+
+.schedule-pill{
+    background:rgba(14,165,233,.08);
+    border:1px solid rgba(14,165,233,.18);
+    border-radius:14px;
+    padding:14px 16px;
+    color:#fff;
+}
+
+.schedule-pill small{
+    display:block;
+    color:#7dd3fc;
+    font-size:12px;
+    margin-bottom:4px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+}
+
+.schedule-pill strong{
+    font-size:16px;
+}
+
+.preview-items-wrap{
+    background:rgba(255,255,255,.03);
+    border:1px solid rgba(255,255,255,.05);
+    border-radius:16px;
+    padding:16px;
+    margin-bottom:18px;
+}
+
+.preview-items-head{
+    display:flex;
+    justify-content:space-between;
+    color:#94a3b8;
+    font-size:12px;
+    font-weight:700;
+    text-transform:uppercase;
+    margin-bottom:10px;
+}
+
+.preview-items .preview-item{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    color:#fff;
+    padding:10px 0;
+    border-bottom:1px solid rgba(255,255,255,.06);
+}
+
+.preview-items .preview-item:last-child{
+    border-bottom:none;
+}
+
+.preview-items .preview-item small{
+    display:block;
+    color:#94a3b8;
+    margin-top:2px;
+}
+
+.preview-totals{
+    margin-top:6px;
+}
+
+.total-row{
+    display:flex;
+    justify-content:space-between;
+    margin-top:12px;
+    color:#fff;
+    font-size:16px;
+}
+
+.tax-row{
+    margin-top:16px;
+}
+
+.tax-row label{
+    display:block;
+    color:#7dd3fc;
+    font-size:13px;
+    font-weight:700;
+    margin-bottom:8px;
+}
+
+.tax-row input{
+    margin-top:0;
+    font-size:18px;
+    padding:14px;
+}
+
+.grand{
+    font-size:34px;
+    font-weight:800;
+    margin-top:18px;
+    align-items:flex-end;
+}
+
+.deposit-box{
+    margin-top:22px;
+    padding:18px;
+    background:linear-gradient(135deg, rgba(14,165,233,.16), rgba(59,130,246,.10));
+    border-radius:16px;
+    border:1px solid rgba(14,165,233,.26);
+}
+
+.deposit-head{
+    display:grid;
+    grid-template-columns:110px 1fr;
+    gap:14px;
+    align-items:end;
+    margin-bottom:16px;
+}
+
+.deposit-head span{
+    color:#7dd3fc;
+    font-size:13px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+}
+
+.deposit-head input{
+    margin-top:0;
+    font-size:20px;
+    font-weight:800;
+}
+
+.deposit-split{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+}
+
+.money-card{
+    background:rgba(2,6,23,.45);
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:14px;
+    padding:14px;
+}
+
+.money-card small{
+    display:block;
+    color:#94a3b8;
+    margin-bottom:8px;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+}
+
+.money-card strong{
+    font-size:30px;
+    color:#fff;
+    display:block;
+    line-height:1.05;
+}
+
+.money-note{
+    display:block;
+    margin-top:8px;
+    color:#7dd3fc;
+    font-size:13px;
+}
+
+.btn-primary{
+    margin-top:22px;
+    width:100%;
+    padding:17px 18px;
+    background:linear-gradient(135deg,#0ea5e9,#2563eb);
+    border:none;
+    border-radius:14px;
+    color:#fff;
+    font-weight:800;
+    font-size:18px;
+    cursor:pointer;
+    box-shadow:0 18px 34px rgba(37,99,235,.28);
+}
+
+@media(max-width:1100px){
+    .grid{grid-template-columns:1fr}
+    .preview-card{position:static}
+}
+
+@media(max-width:760px){
+    .two-col,
+    .preview-schedule,
+    .deposit-split{grid-template-columns:1fr}
+    .thead{display:none}
+    .row{
+        grid-template-columns:1fr;
+        gap:10px;
+        padding:14px;
+        border:1px solid rgba(255,255,255,.06);
+        border-radius:14px;
+        background:rgba(255,255,255,.02);
+    }
+    .line-total,.remove{height:auto}
+    .deposit-head{grid-template-columns:1fr}
+    .grand{font-size:28px}
+}
+
+</style>
+
 <script>
-function money(n){ return Number(n).toFixed(2); }
-function recalc(){
-    let sub = 0;
-    document.querySelectorAll('#items tbody tr').forEach(r => {
-        let q = parseFloat(r.querySelector('.qty')?.value) || 0;
-        let p = parseFloat(r.querySelector('.price')?.value) || 0;
-        let t = q * p;
-        r.querySelector('.lineTotal').innerText = '$' + money(t);
-        sub += t;
-    });
-    document.getElementById('grandTotal').innerText = money(sub);
-}
-document.addEventListener('input', recalc);
+let index = 0;
 
-function addRow(){
-    let tbody = document.querySelector('#items tbody');
-    let i = tbody.children.length;
-    let tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td><input name="items[${i}][desc]" class="form-control bg-transparent border-slate-700 text-white" required></td>
-        <td><input type="number" name="items[${i}][qty]" class="form-control bg-transparent border-slate-700 text-white qty" value="1"></td>
-        <td><input type="number" name="items[${i}][price]" class="form-control bg-transparent border-slate-700 text-white price" value="0" step="0.01"></td>
-        <td class="text-end text-white font-bold pt-3 lineTotal">$0.00</td>
-        <td><button type="button" class="btn btn-link text-danger" onclick="this.closest('tr').remove(); recalc();">X</button></td>
+function addItem(){
+    const container = document.getElementById('items');
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    row.innerHTML = `
+        <input name="items[${index}][description]" placeholder="Service">
+        <input type="number" name="items[${index}][qty]" value="1" min="0" step="0.01" onchange="calc()" oninput="calc()">
+        <input type="number" name="items[${index}][price]" value="0" min="0" step="0.01" onchange="calc()" oninput="calc()">
+        <div class="line-total">$0.00</div>
+        <button type="button" class="remove" onclick="this.parentNode.remove(); calc()">×</button>
     `;
-    tbody.appendChild(tr);
+
+    container.appendChild(row);
+    index++;
+    calc();
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('customer_select').addEventListener('change', function () {
-        let sel = this.options[this.selectedIndex];
-        if(!sel.value) return;
-        
-        document.querySelector('[name="customer_name"]').value = sel.getAttribute('data-name');
-        document.querySelector('[name="customer_email"]').value = sel.getAttribute('data-email');
-        document.querySelector('[name="street_address"]').value = sel.getAttribute('data-street');
-        
-        let city = sel.getAttribute('data-city') || '';
-        let state = sel.getAttribute('data-state') || '';
-        let zip = sel.getAttribute('data-zip') || '';
-        
-        document.querySelector('[name="city_state_zip"]').value = city + ", " + state + " " + zip;
+function formatMoney(value){
+    return '$' + Number(value).toFixed(2);
+}
+
+function formatDateValue(value){
+    if(!value) return '—';
+    const d = new Date(value + 'T00:00:00');
+    if (isNaN(d.getTime())) return value;
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+
+function calc(){
+    const rows = document.querySelectorAll('.row');
+    let subtotal = 0;
+    let previewHTML = '';
+
+    rows.forEach(r => {
+        const desc = r.children[0].value || 'Service';
+        const qty = parseFloat(r.children[1].value) || 0;
+        const price = parseFloat(r.children[2].value) || 0;
+        const total = qty * price;
+
+        r.children[3].innerText = formatMoney(total);
+        subtotal += total;
+
+        previewHTML += `
+            <div class="preview-item">
+                <div>
+                    ${desc}
+                    <small>${qty} × ${formatMoney(price)}</small>
+                </div>
+                <strong>${formatMoney(total)}</strong>
+            </div>
+        `;
     });
+
+    document.getElementById('preview_items').innerHTML = previewHTML || `
+        <div class="preview-item">
+            <div>
+                Service
+                <small>No items added yet</small>
+            </div>
+            <strong>$0.00</strong>
+        </div>
+    `;
+
+    const taxPercent = parseFloat(document.getElementById('tax_percent').value) || 0;
+    const tax = subtotal * (taxPercent / 100);
+    const grand = subtotal + tax;
+
+    const depositPercent = parseFloat(document.getElementById('deposit_percent').value) || 0;
+    const deposit = grand * (depositPercent / 100);
+    const remaining = grand - deposit;
+
+    document.getElementById('subtotal').innerText = formatMoney(subtotal);
+    document.getElementById('tax').innerText = formatMoney(tax);
+    document.getElementById('grand').innerText = formatMoney(grand);
+    document.getElementById('deposit_amount').innerText = formatMoney(deposit);
+    document.getElementById('remaining_amount').innerText = formatMoney(remaining);
+
+    document.getElementById('subtotal_amount_input').value = subtotal.toFixed(2);
+    document.getElementById('tax_amount_input').value = tax.toFixed(2);
+    document.getElementById('grand_total_input').value = grand.toFixed(2);
+    document.getElementById('deposit_amount_input').value = deposit.toFixed(2);
+    document.getElementById('remaining_balance_input').value = remaining.toFixed(2);
+
+    const depositDue = document.getElementById('due_date').value;
+    const remainingDue = document.getElementById('remaining_due_date').value;
+
+    document.getElementById('preview_due_date').innerText = formatDateValue(depositDue);
+    document.getElementById('preview_remaining_due_date').innerText = formatDateValue(remainingDue);
+    document.getElementById('deposit_due_note').innerText = 'Due on ' + formatDateValue(depositDue);
+    document.getElementById('remaining_due_note').innerText = 'Due on ' + formatDateValue(remainingDue);
+}
+
+document.getElementById('customer_id').addEventListener('change', function(){
+    const opt = this.options[this.selectedIndex];
+    document.getElementById('customer_name').value = opt.dataset.name || '';
+    document.getElementById('customer_email').value = opt.dataset.email || '';
+    document.getElementById('customer_phone').value = opt.dataset.phone || '';
+
+    document.getElementById('preview_name').innerText = opt.dataset.name || 'Customer';
+    document.getElementById('preview_email').innerText = opt.dataset.email || '';
 });
+
+document.getElementById('customer_name').addEventListener('input', function(){
+    document.getElementById('preview_name').innerText = this.value || 'Customer';
+});
+
+document.getElementById('customer_email').addEventListener('input', function(){
+    document.getElementById('preview_email').innerText = this.value || '';
+});
+
+document.getElementById('tax_percent').addEventListener('input', calc);
+document.getElementById('deposit_percent').addEventListener('input', calc);
+document.getElementById('due_date').addEventListener('change', calc);
+document.getElementById('remaining_due_date').addEventListener('change', calc);
+
+addItem();
+calc();
 </script>
+
 @endsection

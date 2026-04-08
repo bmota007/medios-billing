@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Config;
 
 class CompanyController extends Controller
 {
@@ -19,14 +20,14 @@ class CompanyController extends Controller
     {
         $user = Auth::user();
 
-        // Identify context: Force Medios Billing for Admin Brand route
+        // Admin context (Medios Billing global settings)
         if (request()->routeIs('admin.brand') || request()->is('admin/brand*')) {
             $company = Company::where('name', 'LIKE', '%Medios Billing%')->first() ?? Company::find(1);
         } else {
             $company = $user->company;
         }
 
-        // Super Admin fallback
+        // Super admin fallback
         if ($user->role === 'super_admin' && !$company) {
             $company = Company::find(1);
         }
@@ -39,14 +40,14 @@ class CompanyController extends Controller
     }
 
     /**
-     * Update the business settings, logo, and contract template.
+     * Update settings
      */
     public function update(Request $request)
     {
         $user = Auth::user();
 
         try {
-            // 1. Target correct company (ID 1 for Admin paths, otherwise User's company)
+            // Resolve company
             if (request()->routeIs('admin.brand.update') || request()->is('admin/brand*')) {
                 $company = Company::find(1);
             } else {
@@ -54,10 +55,12 @@ class CompanyController extends Controller
             }
 
             if (!$company) {
-                return back()->with('error', 'Update failed: Company record not found.');
+                return back()->with('error', 'Company not found.');
             }
 
-            // 2. Map Basic Info & Payment Toggles
+            // =========================
+            // BASIC INFO
+            // =========================
             $company->name = $request->name;
             $company->email = $request->email;
             $company->phone = $request->phone;
@@ -65,6 +68,9 @@ class CompanyController extends Controller
             $company->website = $request->website;
             $company->primary_color = $request->primary_color;
 
+            // =========================
+            // PAYMENT METHODS
+            // =========================
             $company->accept_card = $request->boolean('accept_card');
             $company->accept_check = $request->boolean('accept_check');
             $company->accept_cash = $request->boolean('accept_cash');
@@ -76,7 +82,9 @@ class CompanyController extends Controller
             $company->venmo_label = $request->venmo_label ?? 'Venmo';
             $company->venmo_value = $request->venmo_value;
 
-            // 3. Stripe Keys (Webhook Secret Included)
+            // =========================
+            // STRIPE
+            // =========================
             $company->stripe_mode = $request->stripe_mode ?? 'test';
             $company->stripe_test_publishable_key = $request->stripe_test_publishable_key;
             $company->stripe_test_secret_key = $request->stripe_test_secret_key;
@@ -84,48 +92,97 @@ class CompanyController extends Controller
             $company->stripe_secret_key = $request->stripe_secret_key;
             $company->stripe_webhook_secret = $request->stripe_webhook_secret;
 
-            // 4. Logo Handling (Cleanup and dual-column update)
+            // =========================
+            // SMTP 🔥 (NEW)
+            // =========================
+            $company->smtp_host = $request->smtp_host;
+            $company->smtp_port = $request->smtp_port;
+            $company->smtp_user = $request->smtp_user;
+            $company->smtp_pass = $request->smtp_pass;
+            $company->smtp_from = $request->smtp_from;
+
+            // =========================
+            // LOGO
+            // =========================
             if ($request->hasFile('logo')) {
-                $file = $request->file('logo');
-                
-                $oldPath = $company->logo_path;
-                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
-                    Storage::disk('public')->delete($oldPath);
+                if ($company->logo_path && Storage::disk('public')->exists($company->logo_path)) {
+                    Storage::disk('public')->delete($company->logo_path);
                 }
 
-                $filename = 'Logo_' . time() . '.' . $file->getClientOriginalExtension();
+                $file = $request->file('logo');
+                $filename = 'logo_' . time() . '.' . $file->getClientOriginalExtension();
                 $path = $file->storeAs('logos', $filename, 'public');
-                
+
                 $company->logo = $path;
                 $company->logo_path = $path;
             }
 
-            // 5. Contract Handling
+            // =========================
+            // CONTRACT
+            // =========================
             if ($request->hasFile('contract_template')) {
                 $file = $request->file('contract_template');
-                $path = $file->storeAs('contracts', 'Contract_'.time().'.'.$file->getClientOriginalExtension(), 'public');
+                $path = $file->storeAs(
+                    'contracts',
+                    'contract_' . time() . '.' . $file->getClientOriginalExtension(),
+                    'public'
+                );
+
                 $company->contract_template_path = $path;
                 $company->contract_template_type = $file->getClientOriginalExtension();
             }
 
-            // 6. Save Company Record
-            if (!$company->save()) {
-                throw new \Exception("Database failed to save the company record.");
-            }
+            // SAVE
+            $company->save();
 
-            // 7. Password Update (Matches Blade 'password' input name)
+            // =========================
+            // PASSWORD
+            // =========================
             if ($request->filled('password')) {
                 $request->validate([
                     'password' => 'required|min:8|confirmed',
                 ]);
-                $user->update(['password' => Hash::make($request->password)]);
+
+                $user->update([
+                    'password' => Hash::make($request->password)
+                ]);
             }
 
             return back()->with('success', 'Settings updated successfully!');
 
         } catch (\Exception $e) {
-            Log::error("Critical Update Error: " . $e->getMessage());
-            return back()->with('error', 'Error: ' . $e->getMessage());
+            Log::error("Company Settings Error: " . $e->getMessage());
+            return back()->with('error', 'Error saving settings.');
+        }
+    }
+
+    /**
+     * TEST SMTP EMAIL 🔥
+     */
+    public function testEmail()
+    {
+        $company = auth()->user()->company;
+
+        try {
+            // Apply dynamic SMTP
+            Config::set('mail.mailers.smtp.host', $company->smtp_host);
+            Config::set('mail.mailers.smtp.port', $company->smtp_port);
+            Config::set('mail.mailers.smtp.username', $company->smtp_user);
+            Config::set('mail.mailers.smtp.password', $company->smtp_pass);
+
+            Config::set('mail.from.address', $company->smtp_from);
+            Config::set('mail.from.name', $company->name);
+
+            Mail::raw('SMTP working correctly 🚀', function ($msg) use ($company) {
+                $msg->to($company->email)
+                    ->subject('SMTP Test Successful');
+            });
+
+            return back()->with('success', 'Test email sent successfully!');
+
+        } catch (\Exception $e) {
+            Log::error("SMTP Test Failed: " . $e->getMessage());
+            return back()->with('error', 'SMTP failed: ' . $e->getMessage());
         }
     }
 }

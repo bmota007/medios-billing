@@ -14,45 +14,24 @@ use Illuminate\Support\Str;
 
 class RegisteredUserController extends Controller
 {
-    /**
-     * Show registration form
-     */
     public function create()
     {
         return view('auth.register');
     }
 
-    /**
-     * Handle registration
-     */
     public function store(Request $request)
     {
-
         $request->validate([
-            'name' => ['required','string','max:255'],
-            'email' => ['required','string','email','max:255','unique:users'],
-            'password' => ['required','confirmed', Rules\Password::defaults()],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | CREATE COMPANY AUTOMATICALLY
-        |--------------------------------------------------------------------------
-        */
-
-        $subdomain = Str::slug($request->name);
 
         $company = Company::create([
             'name' => $request->name,
             'email' => $request->email,
-            'subdomain' => $subdomain
+            'subdomain' => Str::slug($request->name)
         ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | CREATE USER LINKED TO COMPANY
-        |--------------------------------------------------------------------------
-        */
 
         $user = User::create([
             'name' => $request->name,
@@ -62,9 +41,8 @@ class RegisteredUserController extends Controller
         ]);
 
         event(new Registered($user));
-
         Auth::login($user);
 
-        return redirect()->route('admin.dashboard');
+        return redirect()->route('dashboard');
     }
 }

@@ -1,169 +1,181 @@
-@extends('layouts.admin')
+@extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
+<div style="max-width:1200px; margin:auto; padding:30px;">
 
-    {{-- TRIAL ACTIVATION BANNER (THE WOW BANNER) --}}
-    @if(auth()->user()->company->subscription_status !== 'trialing' && auth()->user()->company->subscription_status !== 'active')
-    <div class="alert shadow-lg border-0 d-flex justify-content-between align-items-center p-4 mb-5" 
-         style="background: linear-gradient(90deg, #1e293b, #334155); border-left: 5px solid #38bdf8 !important; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.05);">
+    <!-- HEADER -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
         <div>
-            <h5 class="text-white fw-bold mb-1">Your 7-Day Free Trial is Waiting!</h5>
-            <p class="text-secondary mb-0 small">Unlock automated billing, custom branding, and unlimited invoices today.</p>
-        </div>
-        <a href="{{ route('subscribe') }}" class="btn btn-info fw-bold px-4 py-2" style="border-radius: 0.75rem; background-color: #38bdf8; color: #0f172a; border: none;">
-            ACTIVATE TRIAL
-        </a>
-    </div>
-    @endif
-
-    {{-- Header Section with Personalized Greeting --}}
-    <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
-        <div>
-            <h2 class="text-white font-bold mb-0">
-                {{ $greeting }}, <span class="text-sky-400">{{ explode(' ', auth()->user()->name)[0] }}</span>
+            <h2 style="color:white; font-weight:800;">
+                {{ $greeting }}, {{ auth()->user()->name }}
             </h2>
-            <p class="text-secondary mb-0">Welcome back to the <strong>{{ $brandName }}</strong> portal.</p>
+            <p style="color:#94a3b8;">
+                Welcome back to {{ $company->name }}
+            </p>
         </div>
 
-        {{-- WEATHER WIDGET --}}
-        <div id="weather-widget" class="glass-card py-2 px-3 d-flex align-items-center gap-3 mb-0" style="min-width: 220px; border: 1px solid rgba(56, 189, 248, 0.2) !important;">
-            <div id="weather-icon"><i class="fa-solid fa-cloud-sun text-info fa-xl"></i></div>
-            <div>
-                <div id="weather-temp" class="text-white fw-bold">--°F</div>
-                <div id="weather-city" class="text-white-50" style="font-size: 11px;">Fetching Weather...</div>
-            </div>
+        <div style="
+            padding:8px 14px;
+            border-radius:10px;
+            font-weight:bold;
+            background: {{ $stripeStatus == 'LIVE' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)' }};
+            color: {{ $stripeStatus == 'LIVE' ? '#22c55e' : '#f59e0b' }};
+        ">
+            ⚡ STRIPE: {{ $stripeStatus }}
         </div>
     </div>
 
-    {{-- Stats Row --}}
-    <div class="row g-4 mb-4">
-        <div class="col-md-3">
-            <div class="dashboard-card h-100 border-start border-success border-4">
-                <div class="text-white-50 small uppercase fw-bold mb-2">Total Revenue</div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <h2 class="mb-0 text-success fw-bold">${{ number_format($revenue ?? 0, 2) }}</h2>
-                    <i class="fa-solid fa-dollar-sign text-success opacity-25 fa-2x"></i>
-                </div>
+    <!-- 🔥 STATS -->
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:20px; margin-bottom:40px;">
+
+        <div style="padding:25px; border-radius:16px; border:2px solid #22c55e; background:rgba(15,23,42,0.6);">
+            <div style="color:#94a3b8; font-size:13px;">Total Revenue</div>
+            <div style="font-size:28px; font-weight:800; color:#22c55e;">
+                ${{ number_format($stats['total_revenue'], 2) }}
             </div>
         </div>
 
-        <div class="col-md-3">
-            <div class="dashboard-card h-100 border-start border-primary border-4">
-                <div class="text-white-50 small uppercase fw-bold mb-2">Total Invoices</div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <h2 class="mb-0 text-white fw-bold">{{ $invoicesCount ?? 0 }}</h2>
-                    <i class="fa-solid fa-file-invoice text-primary opacity-25 fa-2x"></i>
-                </div>
+        <div style="padding:25px; border-radius:16px; border:2px solid #3b82f6; background:rgba(15,23,42,0.6);">
+            <div style="color:#94a3b8; font-size:13px;">Total Invoices</div>
+            <div style="font-size:28px; font-weight:800; color:white;">
+                {{ $stats['total_invoices'] }}
             </div>
         </div>
 
-        <div class="col-md-3">
-            <div class="dashboard-card h-100 border-start border-info border-4">
-                <div class="text-white-50 small uppercase fw-bold mb-2">Paid Invoices</div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <h2 class="mb-0 text-info fw-bold">{{ $paidInvoices ?? 0 }}</h2>
-                    <i class="fa-solid fa-check-double text-info opacity-25 fa-2x"></i>
-                </div>
+        <div style="padding:25px; border-radius:16px; border:2px solid #06b6d4; background:rgba(15,23,42,0.6);">
+            <div style="color:#94a3b8; font-size:13px;">Paid</div>
+            <div style="font-size:28px; font-weight:800; color:#06b6d4;">
+                {{ $stats['paid_invoices'] }}
             </div>
         </div>
 
-        <div class="col-md-3">
-            <div class="dashboard-card h-100 border-start border-warning border-4">
-                <div class="text-white-50 small uppercase fw-bold mb-2">Pending Invoices</div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <h2 class="mb-0 text-warning fw-bold">{{ $pendingInvoices ?? 0 }}</h2>
-                    <i class="fa-solid fa-clock text-warning opacity-25 fa-2x"></i>
-                </div>
+        <div style="padding:25px; border-radius:16px; border:2px solid #f59e0b; background:rgba(15,23,42,0.6);">
+            <div style="color:#94a3b8; font-size:13px;">Pending</div>
+            <div style="font-size:28px; font-weight:800; color:#f59e0b;">
+                {{ $stats['pending_invoices'] }}
             </div>
+        </div>
+
+    </div>
+
+    <!-- 📊 CHART -->
+    <div style="background:rgba(15,23,42,0.6); padding:25px; border-radius:16px; margin-bottom:40px;">
+        <h4 style="color:white; margin-bottom:20px;">Revenue Overview</h4>
+
+        <div style="height:320px;">
+            <canvas id="chart"></canvas>
         </div>
     </div>
 
-    {{-- Revenue Overview Chart --}}
-    <div class="row g-4 mb-4">
-        <div class="col-12">
-            <div class="dashboard-card">
-                <h3 class="text-lg font-semibold text-white mb-4">Revenue Overview</h3>
-                <div id="revenueChart" style="min-height: 350px;"></div>
-            </div>
-        </div>
-    </div>
+    <!-- 💎 ACTIVITY -->
+    <div style="background:rgba(15,23,42,0.6); padding:25px; border-radius:16px;">
 
-    {{-- Recent Invoices Table --}}
-    <div class="row g-4">
-        <div class="col-12">
-            <div class="dashboard-card">
-                <h3 class="text-lg font-semibold text-white mb-4">Recent Invoices</h3>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle">
-                        <thead>
-                            <tr class="text-secondary small uppercase">
-                                <th class="pb-3 border-0">Invoice</th>
-                                <th class="pb-3 border-0">Customer</th>
-                                <th class="pb-3 border-0">Amount</th>
-                                <th class="pb-3 border-0">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="text-light">
-                            @foreach($recentInvoices as $invoice)
-                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05)">
-                                <td class="py-3 font-mono text-sky-400">#{{ $invoice->invoice_no ?? $invoice->id }}</td>
-                                <td>{{ $invoice->customer_name }}</td>
-                                <td class="text-white fw-bold">${{ number_format($invoice->total, 2) }}</td>
-                                <td>
-                                    @if($invoice->status == 'paid')
-                                        <span class="badge bg-success px-3">PAID</span>
-                                    @else
-                                        <span class="badge bg-warning text-dark px-3">PENDING</span>
-                                    @endif
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+        <h4 style="color:white; margin-bottom:20px;">Recent Activity</h4>
+
+        @forelse($recentInvoices as $inv)
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding:12px;
+            border-radius:10px;
+            margin-bottom:10px;
+            transition:0.2s;
+        "
+        onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+        onmouseout="this.style.background='transparent'">
+
+            <div style="display:flex; gap:12px; align-items:center;">
+                <div style="
+                    width:40px;
+                    height:40px;
+                    border-radius:10px;
+                    background:rgba(56,189,248,0.2);
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    color:#38bdf8;
+                ">
+                    📄
+                </div>
+
+                <div>
+                    <strong style="color:white;">#{{ $inv->invoice_no }}</strong>
+                    <div style="color:#94a3b8; font-size:12px;">
+                        {{ $inv->customer_name }}
+                    </div>
                 </div>
             </div>
+
+            <div style="text-align:right;">
+                <div style="color:white; font-weight:700;">
+                    ${{ number_format($inv->total, 2) }}
+                </div>
+
+                <div style="
+                    font-size:11px;
+                    padding:3px 10px;
+                    border-radius:999px;
+                    margin-top:5px;
+                    display:inline-block;
+                    background:
+                    {{ $inv->status == 'paid' ? '#dcfce7' :
+                       ($inv->status == 'pending' ? '#fef3c7' : '#fee2e2') }};
+                    color:
+                    {{ $inv->status == 'paid' ? '#166534' :
+                       ($inv->status == 'pending' ? '#92400e' : '#991b1b') }};
+                ">
+                    {{ strtoupper($inv->status) }}
+                </div>
+            </div>
+
         </div>
+
+        @empty
+            <p style="color:#94a3b8;">No activity yet</p>
+        @endforelse
+
     </div>
+
 </div>
 
-{{-- Scripts --}}
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<!-- CHART -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    async function getWeather() {
-        try {
-            const locRes = await fetch('https://ipapi.co/json/');
-            const locData = await locRes.json();
-            const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${locData.latitude}&longitude=${locData.longitude}&current_weather=true&temperature_unit=fahrenheit`);
-            const weatherData = await weatherRes.json();
-            document.getElementById('weather-temp').innerText = Math.round(weatherData.current_weather.temperature) + '°F';
-            document.getElementById('weather-city').innerText = locData.city;
-        } catch (e) { 
-            document.getElementById('weather-city').innerText = "Weather Unavailable"; 
+new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: {
+        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+        datasets: [{
+            data: @json($chartData),
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56,189,248,0.15)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 5,
+            pointHoverRadius: 10
+        }]
+    },
+    options: {
+        responsive:true,
+        maintainAspectRatio:false,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{ legend:{ display:false }},
+        scales:{
+            y:{
+                ticks:{
+                    color:'#94a3b8',
+                    callback:v=>'$'+v
+                },
+                grid:{ color:'rgba(255,255,255,0.05)' }
+            },
+            x:{
+                ticks:{ color:'#94a3b8' },
+                grid:{ display:false }
+            }
         }
     }
-    getWeather();
-
-    document.addEventListener("DOMContentLoaded", function() {
-        var options = {
-            series: [{ name: 'Revenue', data: @json(array_values($revenueTrend)) }],
-            chart: { type: 'area', height: 350, toolbar: { show: false }, foreColor: '#94a3b8', background: 'transparent' },
-            colors: ['#38bdf8'],
-            stroke: { curve: 'smooth', width: 3 },
-            fill: { type: 'gradient', gradient: { opacityFrom: 0.5, opacityTo: 0.1 } },
-            xaxis: { categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] },
-            grid: { borderColor: 'rgba(255,255,255,0.05)' },
-            dataLabels: { enabled: false }
-        };
-        new ApexCharts(document.querySelector("#revenueChart"), options).render();
-    });
+});
 </script>
-
-<style>
-    .font-bold { font-weight: 700; }
-    .uppercase { text-transform: uppercase; letter-spacing: 1px; }
-    .dashboard-card { transition: transform 0.2s; background: rgba(15,23,42,0.9); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.05); }
-    .dashboard-card:hover { transform: translateY(-5px); }
-    .glass-card { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); border-radius: 12px; }
-</style>
 @endsection
