@@ -2,43 +2,68 @@
 
 namespace App\Http\Controllers;
 
-use Stripe\Stripe;
-use Stripe\Checkout\Session;
-use App\Models\Invoice;
+/*
+|--------------------------------------------------------------------------
+| IMPORTS
+|--------------------------------------------------------------------------
+*/
+use App\Mail\InvoiceCreatedMail;
 use App\Models\Customer;
-use App\Models\Quote;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Log;
-use App\Mail\InvoicePaidMail; // Corrected Mailable name
+use Stripe\Stripe;
+use Stripe\Checkout\Session as StripeSession;
 
+/*
+|--------------------------------------------------------------------------
+| CONTROLLER
+|--------------------------------------------------------------------------
+*/
 class InvoiceController extends Controller
 {
-    /**
-     * 1. ADMINISTRATIVE VIEWS
-     */
+    public function showPaymentPage($invoice_no)
+    {
+        $invoice = Invoice::with('company')
+            ->where('invoice_no', $invoice_no)
+            ->firstOrFail();
+
+        // 🚫 BLOCK ACCESS IF ALREADY PAID
+        if ($invoice->status === 'paid') {
+            return redirect()->route('invoice.public_view', $invoice_no)
+                ->with('error', 'This invoice has already been paid.');
+        }
+
+        $items = json_decode($invoice->items, true) ?? [];
+
+        return view('invoice.payment', compact('invoice', 'items'));
+    }
 
     public function showForm()
     {
         $user = auth()->user();
         $customers = Customer::where('company_id', $user->company_id)->orderBy('name')->get();
         $company = $user->company;
+
         return view('invoice.form', compact('customers', 'company'));
     }
 
     public function history(Request $request)
     {
         $query = Invoice::where('company_id', auth()->user()->company_id);
-        if ($request->has('search')) {
+
+        if ($request->has('search') && $request->get('search') !== '') {
             $search = $request->get('search');
-            $query->where(function($q) use ($search) {
+
+            $query->where(function ($q) use ($search) {
                 $q->where('customer_name', 'LIKE', "%{$search}%")
                   ->orWhere('customer_email', 'LIKE', "%{$search}%")
                   ->orWhere('invoice_no', 'LIKE', "%{$search}%");
             });
         }
+
         $invoices = $query->latest()->paginate(15);
+
         return view('invoice.history', compact('invoices'));
     }
 
@@ -46,181 +71,239 @@ class InvoiceController extends Controller
     {
         $invoice = Invoice::with('company')
             ->where('invoice_no', $id_or_no)
-            ->orWhere('id', $id_or_no) 
-            ->firstOrFail();
-
-        if ((int)$invoice->company_id !== (int)auth()->user()->company_id) {
-            abort(403, 'Unauthorized access to this invoice.');
-        }
-
-        $items = json_decode($invoice->items, true) ?? [];
-        return view('invoice.public_view', compact('invoice', 'items'));
-    }
-
-    public function edit($id_or_no)
-    {
-        $invoice = Invoice::where('invoice_no', $id_or_no)->orWhere('id', $id_or_no)->firstOrFail();
-        $customers = Customer::where('company_id', auth()->user()->company_id)->get();
-        return view('invoice.form', compact('invoice', 'customers'));
-    }
-
-    public function update(Request $request, $id)
-    {
-        $invoice = Invoice::findOrFail($id);
-        $invoice->customer_name = $request->customer_name;
-        $invoice->customer_email = $request->customer_email;
-        $invoice->items = json_encode($request->items ?? []);
-        
-        $total = 0;
-        foreach ($request->items as $item) {
-            $total += ($item['qty'] ?? 1) * ($item['price'] ?? 0);
-        }
-        $invoice->total = $total;
-        $invoice->save();
-
-        return redirect()->route('invoice.view', $invoice->invoice_no)->with('success', 'Invoice Updated Successfully!');
-    }
-
-    /**
-     * 2. CORE ACTIONS
-     */
-
-    public function send(Request $request)
-    {
-        $company = auth()->user()->company;
-        $invoice = new Invoice();
-        $invoice->company_id = $company->id;
-        $invoice->customer_name = $request->customer_name;
-        $invoice->customer_email = $request->customer_email;
-        $invoice->street_address = $request->street_address;
-        $invoice->city_state_zip = $request->city_state_zip;
-        $invoice->invoice_date = $request->invoice_date;
-        $invoice->due_date = $request->due_date;
-        $invoice->invoice_no = 'INV-' . time();
-        
-        $items = $request->items ?? [];
-        $invoice->items = json_encode($items);
-
-        $total = 0;
-        foreach ($items as $item) {
-            $total += ($item['qty'] ?? 1) * ($item['price'] ?? 0);
-        }
-        
-        $invoice->total = $total;
-        $invoice->status = 'pending';
-        $invoice->save();
-
-        return redirect()->route('invoice.view', $invoice->invoice_no)->with('success', 'Invoice generated successfully!');
-    }
-
-    public function sendEmail($invoice_no)
-    {
-        $invoice = Invoice::with('company')
-            ->where('invoice_no', $invoice_no)
-            ->orWhere('id', $invoice_no)
-            ->firstOrFail();
-
-        $pdf = Pdf::loadView('pdf.invoice', ['invoice' => $invoice]);
-
-        Mail::send('emails.invoice_notification', ['invoice' => $invoice], function ($message) use ($invoice, $pdf) {
-            $message->to($invoice->customer_email)
-                    ->subject('Invoice #' . $invoice->invoice_no . ' from ' . $invoice->company->name)
-                    ->attachData($pdf->output(), $invoice->invoice_no . '.pdf');
-        });
-
-        return redirect()->back()->with('success', 'Invoice sent to customer successfully!');
-    }
-
-    public function resend($id)
-    {
-        return $this->sendEmail($id);
-    }
-
-    public function downloadPdf($id_or_no)
-    {
-        $invoice = Invoice::with('company')
-            ->where('invoice_no', $id_or_no)
             ->orWhere('id', $id_or_no)
             ->firstOrFail();
 
-        $pdf = Pdf::loadView('pdf.invoice', ['invoice' => $invoice]);
-        return $pdf->download($invoice->invoice_no . '.pdf');
-    }
-
-    public function destroy(Invoice $invoice)
-    {
         if ((int)$invoice->company_id !== (int)auth()->user()->company_id) {
-            abort(403, 'Unauthorized action.');
-        }
-        $invoice->delete();
-        return redirect()->route('invoice.history')->with('success', 'Invoice deleted successfully.');
-    }
-
-public function markPaid($id)
-    {
-        $invoice = Invoice::findOrFail($id);
-        $invoice->update(['status' => 'paid', 'paid_at' => now()]);
-
-        // Send Professional Receipt
-        try {
-            Mail::to($invoice->customer_email)->send(new \App\Mail\InvoicePaidMail($invoice));
-        } catch (\Exception $e) {
-            Log::error("Manual Mark Paid Email Error: " . $e->getMessage());
+            abort(403);
         }
 
-        return redirect()->back()->with('success', 'Invoice marked as paid.');
-    }
+        $items = json_decode($invoice->items, true) ?? [];
 
-    /**
-     * 3. PUBLIC & PAYMENT METHODS
-     */
+        return view('invoice.public_view', compact('invoice', 'items'));
+    }
 
     public function publicView($invoice_no)
     {
+        $invoice = Invoice::with('company')
+            ->where('invoice_no', $invoice_no)
+            ->firstOrFail();
+
+        $items = json_decode($invoice->items, true) ?? [];
+
+        if ($invoice->status === 'sent') {
+            $invoice->update(['status' => 'viewed']);
+        }
+
+        return view('invoice.public_view', compact('invoice', 'items'));
+    }
+
+    public function downloadPdf($id)
+    {
+        $invoice = Invoice::with('company')->findOrFail($id);
+        $items = json_decode($invoice->items, true) ?? [];
+
+        $html = view('invoice.public_view', compact('invoice', 'items'))->render();
+
+        return response($html)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'attachment; filename="invoice-'.$invoice->invoice_no.'.pdf"');
+    }
+
+    public function edit($id)
+    {
+        $invoice = Invoice::findOrFail($id);
+        $user = auth()->user();
+        $customers = Customer::where('company_id', $user->company_id)->orderBy('name')->get();
+        $company = $user->company;
+
+        return view('invoice.edit', compact('invoice', 'customers', 'company'));
+    }
+
+public function send(Request $request)
+{
+    $user = auth()->user();
+    $company = $user->company;
+
+    $invoice = new Invoice();
+    $invoice->company_id = $company->id;
+    $invoice->customer_name = $request->customer_name;
+    $invoice->customer_email = $request->customer_email;
+    $invoice->customer_phone = $request->customer_phone;
+
+    $invoice->invoice_date = $request->invoice_date;
+    $invoice->due_date = $request->due_date;
+    $invoice->remaining_due_date = $request->remaining_due_date;
+    $invoice->invoice_no = 'INV-' . time();
+
+    $items = is_array($request->items) ? $request->items : [];
+    $invoice->items = json_encode($items);
+
+    $subtotal = 0;
+    foreach ($items as $item) {
+        $subtotal += ((float)$item['qty']) * ((float)$item['price']);
+    }
+
+    $taxPercent = (float)$request->tax_percent;
+    $taxAmount = $subtotal * ($taxPercent / 100);
+    $total = $subtotal + $taxAmount;
+
+    $depositPercent = (float)$request->deposit_percent;
+    $depositAmount = $total * ($depositPercent / 100);
+    $remainingBalance = $total - $depositAmount;
+
+    $invoice->subtotal_amount = $subtotal;
+    $invoice->tax_percent = $taxPercent;
+    $invoice->tax_amount = $taxAmount;
+    $invoice->deposit_percent = $depositPercent;
+    $invoice->deposit_amount = $depositAmount;
+    $invoice->remaining_balance = $remainingBalance;
+    $invoice->auto_charge_enabled = $request->has('auto_charge_enabled');
+    $invoice->total = $total;
+    $invoice->status = 'pending';
+
+    $invoice->save();
+
+    return redirect()->route('invoice.view', $invoice->invoice_no)
+        ->with('success', 'Invoice created. Review before sending.');
+}    // your existing send() code here...
+
+public function update(Request $request, $id)
+{
+
+    $invoice = Invoice::findOrFail($id);
+
+    // 🔒 SECURITY CHECK
+    if ((int)$invoice->company_id !== (int)auth()->user()->company_id) {
+        abort(403);
+    }
+
+    // 🚫 BLOCK EDIT IF FULLY PAID
+    if ($invoice->status === 'paid') {
+        return back()->with('error', 'Cannot edit a fully paid invoice.');
+    }
+
+    // BASIC INFO
+    $invoice->customer_name = $request->customer_name;
+    $invoice->customer_email = $request->customer_email;
+    $invoice->customer_phone = $request->customer_phone;
+
+    $invoice->invoice_date = $request->invoice_date;
+    $invoice->due_date = $request->due_date;
+    $invoice->remaining_due_date = $request->remaining_due_date;
+
+    // ITEMS
+    $items = is_array($request->items) ? $request->items : [];
+    $invoice->items = json_encode($items);
+
+    // CALCULATIONS
+    $subtotal = 0;
+    foreach ($items as $item) {
+        $qty = (float) ($item['qty'] ?? 0);
+        $price = (float) ($item['price'] ?? 0);
+        $subtotal += $qty * $price;
+    }
+
+    $taxPercent = (float) ($request->tax_percent ?? 0);
+    $taxAmount = $subtotal * ($taxPercent / 100);
+    $total = $subtotal + $taxAmount;
+
+    $depositPercent = (float) ($request->deposit_percent ?? 0);
+    $depositAmount = $total * ($depositPercent / 100);
+
+    // 🔥 CRITICAL (KEEP PAYMENTS SAFE)
+    $amountPaid = (float) ($invoice->amount_paid ?? 0);
+    $remainingBalance = max($total - $amountPaid, 0);
+
+    // STATUS LOGIC
+    if ($amountPaid <= 0) {
+        $invoice->status = 'pending';
+    } elseif ($remainingBalance > 0) {
+        $invoice->status = 'partial';
+    } else {
+        $invoice->status = 'paid';
+    }
+
+    // SAVE
+    $invoice->subtotal_amount = $subtotal;
+    $invoice->tax_percent = $taxPercent;
+    $invoice->tax_amount = $taxAmount;
+    $invoice->deposit_percent = $depositPercent;
+    $invoice->deposit_amount = $depositAmount;
+    $invoice->remaining_balance = $remainingBalance;
+    $invoice->total = $total;
+
+    $invoice->save();
+
+    return redirect()->route('invoice.view', $invoice->invoice_no)
+        ->with('success', 'Invoice updated successfully.');
+}
+
+    public function sendEmail($invoice_no)
+    {
+        $invoice = Invoice::with('company')->where('invoice_no', $invoice_no)->firstOrFail();
+
         try {
-            $invoice = Invoice::where('invoice_no', $invoice_no)->firstOrFail();
-            return view('invoice.public', compact('invoice'));
+            if ($invoice->customer_email) {
+                Mail::to($invoice->customer_email)->send(new \App\Mail\InvoiceCreatedMail($invoice));
+            }
+
+            if ($invoice->customer_phone) {
+                $message = "Hi {$invoice->customer_name}, your invoice #{$invoice->invoice_no} is ready.\n";
+                $message .= route('invoice.public_view', $invoice->invoice_no);
+                app(\App\Services\SmsService::class)->send($invoice->customer_phone, $message);
+            }
+
+            if ($invoice->status === 'pending') {
+                $invoice->status = 'sent';
+                $invoice->save();
+            }
+
+            return back()->with('success', 'Invoice sent successfully.');
         } catch (\Exception $e) {
-            return response()->json(['error' => 'INVOICE LOAD FAILED'], 500);
+            return back()->with('error', $e->getMessage());
         }
     }
 
-    public function showPaymentPage($invoice_no)
+    public function sendSms(Request $request, $invoice_no)
     {
-        $invoice = Invoice::with('company')->where('invoice_no', $invoice_no)->firstOrFail();
-        return view('invoice.payment', compact('invoice'));
+        $invoice = Invoice::where('invoice_no', $invoice_no)->firstOrFail();
+        app(\App\Services\SmsService::class)->send($request->phone, $request->message);
+        return response()->json(['success' => true]);
+    }
+
+    public function destroy($id)
+    {
+        $invoice = Invoice::findOrFail($id);
+        if ((int)$invoice->company_id !== (int)auth()->user()->company_id) { abort(403); }
+        $invoice->delete();
+        return redirect()->route('invoice.history')->with('success', 'Invoice deleted successfully');
     }
 
     public function stripeCheckout($invoice_no)
     {
-        $invoice = Invoice::where('invoice_no', $invoice_no)->with('company')->firstOrFail();
-        $company = $invoice->company;
+        $invoice = Invoice::with('company')->where('invoice_no', $invoice_no)->firstOrFail();
+        \Stripe\Stripe::setApiKey($invoice->company->stripe_secret_key);
 
-        $stripeSecret = ($company->stripe_mode === 'live') 
-            ? $company->stripe_secret_key 
-            : $company->stripe_test_secret_key;
+$amountToCharge = ($invoice->deposit_amount > 0 && ($invoice->amount_paid ?? 0) == 0)
+    ? $invoice->deposit_amount
+    : ($invoice->remaining_balance ?? $invoice->total);
 
-        \Stripe\Stripe::setApiKey($stripeSecret ?: config('services.stripe.secret'));
+        $baseUrl = config('app.url');
 
         $session = \Stripe\Checkout\Session::create([
             'payment_method_types' => ['card'],
             'line_items' => [[
                 'price_data' => [
                     'currency' => 'usd',
-                    'product_data' => [
-                        'name' => "Payment for Invoice #{$invoice->invoice_no}",
-                    ],
-                    'unit_amount' => (int)($invoice->total * 100),
+                    'product_data' => ['name' => 'Invoice #' . $invoice->invoice_no],
+                    'unit_amount' => (int) ($amountToCharge * 100),
                 ],
                 'quantity' => 1,
             ]],
             'mode' => 'payment',
-            'success_url' => route('stripe.success', $invoice->invoice_no),
-            'cancel_url' => route('invoice.public_view', $invoice->invoice_no),
-            'metadata' => [
-                'invoice_no' => $invoice->invoice_no,
-                'company_id' => $company->id
-            ],
+            'success_url' => $baseUrl . '/invoice/success/' . $invoice->invoice_no,
+            'cancel_url' => $baseUrl . '/invoice/view/' . $invoice->invoice_no,
         ]);
 
         return redirect($session->url);
@@ -229,29 +312,84 @@ public function markPaid($id)
     public function stripeSuccess($invoice_no)
     {
         $invoice = Invoice::with('company')->where('invoice_no', $invoice_no)->firstOrFail();
-        if ($invoice->status !== 'paid') {
-            $invoice->update(['status' => 'paid', 'paid_at' => now()]);
+
+$amountPaidNow = ($invoice->deposit_amount > 0 && ($invoice->amount_paid ?? 0) == 0)
+            ? $invoice->deposit_amount
+            : ($invoice->remaining_balance ?? $invoice->total);
+
+        $previousPaid = $invoice->amount_paid ?? 0;
+        $newTotalPaid = $previousPaid + $amountPaidNow;
+
+        $invoice->amount_paid = $newTotalPaid;
+        $invoice->paid_at = now();
+
+        $remaining = $invoice->total - $newTotalPaid;
+        $invoice->remaining_balance = max($remaining, 0);
+
+        if ($remaining <= 0) {
+            $invoice->status = 'paid';
+        } else {
+            $invoice->status = 'partial';
         }
-        return view('invoice.success', compact('invoice'));
+
+        $invoice->save();
+
+        if ($invoice->customer_email) {
+            Mail::to($invoice->customer_email)->send(new \App\Mail\InvoicePaidMail($invoice));
+        }
+
+        if ($invoice->company && $invoice->company->email) {
+            Mail::to($invoice->company->email)->send(new \App\Mail\InvoicePaidAdminMail($invoice));
+        }
+
+        return redirect()->route('invoice.payment.success', $invoice_no);
     }
 
-public function submitManualPayment(Request $request, $invoice_no)
+    public function submitManualPayment(Request $request, $invoice_no)
+    {
+        $invoice = Invoice::with('company')->where('invoice_no', $invoice_no)->firstOrFail();
+
+        if ($invoice->status === 'paid') {
+            return redirect()->route('invoice.public_view', $invoice_no)->with('error', 'Invoice already paid.');
+        }
+
+        $amountPaid = (float) $request->amount_paid;
+        if ($amountPaid <= 0) { return back()->with('error', 'Invalid payment amount.'); }
+
+        $invoice->payment_method = $request->payment_method;
+        $invoice->payment_notes = $request->payment_notes ?? null;
+        $invoice->check_number = $request->check_number ?? null;
+        $invoice->paid_at = now();
+
+        $previousPaid = $invoice->amount_paid ?? 0;
+        $newTotalPaid = $previousPaid + $amountPaid;
+        $invoice->amount_paid = $newTotalPaid;
+
+        $remaining = $invoice->total - $newTotalPaid;
+        $invoice->remaining_balance = max($remaining, 0);
+
+        if ($remaining <= 0) {
+            $invoice->status = 'paid';
+        } elseif ($newTotalPaid > 0) {
+            $invoice->status = 'partial';
+        }
+
+        $invoice->save();
+
+        if ($invoice->customer_email) {
+            Mail::to($invoice->customer_email)->send(new \App\Mail\InvoicePaidMail($invoice));
+        }
+
+        if ($invoice->company && $invoice->company->email) {
+            Mail::to($invoice->company->email)->send(new \App\Mail\InvoicePaidAdminMail($invoice));
+        }
+
+        return redirect()->route('invoice.payment.success', $invoice_no);
+    }
+
+    public function paymentSuccess($invoice_no)
     {
         $invoice = Invoice::where('invoice_no', $invoice_no)->firstOrFail();
-        $invoice->update([
-            'status' => 'paid',
-            'paid_at' => now(),
-            'payment_method' => $request->payment_method
-        ]);
-
-        // Send Professional Receipt
-        try {
-            Mail::to($invoice->customer_email)->send(new \App\Mail\InvoicePaidMail($invoice));
-        } catch (\Exception $e) {
-            Log::error("Manual Payment Email Error: " . $e->getMessage());
-        }
-
-        return redirect()->route('stripe.success', $invoice->invoice_no);
+        return view('invoice.payment_success', compact('invoice'));
     }
-
-}
+} // <--- THIS WAS THE MISSING BRACKET

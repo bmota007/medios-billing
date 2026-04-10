@@ -9,8 +9,9 @@
         <p>Professional billing with real-time preview, deposit tracking, and remaining balance scheduling</p>
     </div>
 
-    <form action="{{ route('invoice.send') }}" method="POST">
-        @csrf
+<form action="{{ route('invoice.update', $invoice->id) }}" method="POST">
+    @csrf
+    @method('PUT')
 
         {{-- Hidden Calculated Fields --}}
         <input type="hidden" name="deposit_amount" id="deposit_amount_input">

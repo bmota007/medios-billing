@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class InvoicePaidMail extends Mailable
 {
@@ -13,21 +14,30 @@ class InvoicePaidMail extends Mailable
 
     public $invoice;
 
-    /**
-     * Create a new message instance.
-     */
     public function __construct(Invoice $invoice)
     {
         $this->invoice = $invoice;
     }
 
-    /**
-     * Build the message.
-     */
     public function build()
     {
-        // This ensures the "Blue Bar" template (payment_received) is used
+        $items = json_decode($this->invoice->items, true) ?? [];
+
+        // Generate PDF
+$pdf = Pdf::loadView('invoice.pdf', [
+    'invoice' => $this->invoice,
+    'items' => json_decode($this->invoice->items, true) ?? []
+]);
+
+
         return $this->subject('Payment Received - Invoice #' . $this->invoice->invoice_no)
-                    ->view('emails.payment_received');
+            ->view('emails.invoice_paid')
+            ->attachData(
+                $pdf->output(),
+                'Invoice-' . $this->invoice->invoice_no . '.pdf',
+                [
+                    'mime' => 'application/pdf',
+                ]
+            );
     }
 }

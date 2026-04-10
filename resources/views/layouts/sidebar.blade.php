@@ -9,7 +9,7 @@
     </div>
 
     <!-- ADMIN -->
-    @if(auth()->user()->role === 'super_admin')
+@if(auth()->check() && auth()->user()->role === 'super_admin')
     <div class="mb-6">
         <p class="text-xs text-gray-500 uppercase mb-3">Administration</p>
 
@@ -61,7 +61,7 @@
     </div>
 
     <!-- SALES TEAM -->
-    @if(auth()->user()->role === 'super_admin')
+@if(auth()->check() && auth()->user()->role === 'super_admin')
     <div class="mb-6">
         <p class="text-xs text-yellow-400 uppercase mb-3">Sales Team</p>
 
