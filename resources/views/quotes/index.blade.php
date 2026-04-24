@@ -12,10 +12,10 @@
     <div class="crm-actions">
         <form method="GET" action="{{ route('quotes.index') }}" class="crm-search">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input
-                type="text"
-                name="search"
-                placeholder="Search..."
+            <input 
+                type="text" 
+                name="search" 
+                placeholder="Search..." 
                 value="{{ request('search') }}"
             >
         </form>
@@ -80,6 +80,15 @@
                 <a href="{{ route('quotes.show', $quote->id) }}" class="crm-link">View</a>
                 <a href="{{ route('quotes.edit', $quote->id) }}" class="crm-link text-warning">Edit</a>
                 
+                {{-- 🔥 ADDED DELETE ACTION --}}
+                <form action="{{ route('quotes.destroy', $quote->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this quote?')">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="crm-link text-danger border-0 bg-transparent p-0" style="cursor: pointer;">
+                        Delete
+                    </button>
+                </form>
+                
                 @if(isset($quote->status) && strtolower($quote->status) === 'approved')
                     <span class="badge bg-success text-white">SIGNED</span>
                 @endif
@@ -132,7 +141,7 @@
 .crm-stat strong { font-size: 15px; color: white; }
 
 .crm-right { width: 15%; }
-.crm-link { font-size: 13px; color: #38bdf8; text-decoration: none; }
+.crm-link { font-size: 13px; color: #38bdf8; text-decoration: none; border: none; background: none; }
 
 /* Mobile stacking */
 @media (max-width: 767.98px) {

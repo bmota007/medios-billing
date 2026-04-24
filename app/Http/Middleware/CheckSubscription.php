@@ -4,40 +4,98 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpFoundation\Response;
 
 class CheckSubscription
 {
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
-        $user = Auth::user();
+        $user = auth()->user();
 
-        // 1. Bypass for Super Admins
-        if ($user && $user->role === 'super_admin') {
-            return $next($request);
+        /*
+        |--------------------------------------------------------------------------
+        | NOT LOGGED IN
+        |--------------------------------------------------------------------------
+        */
+        if (!$user) {
+            return redirect()->route('login');
         }
 
-        if (!$user || !$user->company) {
-            return redirect()->route('login');
+        /*
+        |--------------------------------------------------------------------------
+        | SUPER ADMIN BYPASS
+        |--------------------------------------------------------------------------
+        */
+        if ($user->role === 'super_admin') {
+            return $next($request);
         }
 
         $company = $user->company;
 
-        // 2. Bypass for System Accounts (Medios Billing)
-        if ($company->plan === 'SYSTEM') {
+        /*
+        |--------------------------------------------------------------------------
+        | NO COMPANY LINKED
+        |--------------------------------------------------------------------------
+        */
+        if (!$company) {
+            auth()->logout();
+
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ALLOW CUSTOMER TO ACCESS SUBSCRIPTION PAGE ALWAYS
+        |--------------------------------------------------------------------------
+        */
+        if ($request->routeIs('subscription.portal') ||
+            $request->routeIs('subscription.cancel') ||
+            $request->routeIs('checkout.subscribe')) {
             return $next($request);
         }
 
-        // Settings, Profile, and Logout are always allowed
-        if ($request->is('company/settings*') || $request->is('logout') || $request->is('profile*')) {
-            return $next($request);
+        /*
+        |--------------------------------------------------------------------------
+        | MUST COMPLETE CHECKOUT FIRST
+        |--------------------------------------------------------------------------
+        */
+        if ($company->subscription_status === 'pending_checkout') {
+            return redirect()->route('billing.locked');
         }
 
-        // 3. Active check for standard Tenants
-        if (!$company->is_active && $company->subscription_status !== 'trialing') {
-            return redirect()->route('company.settings')->with('warning', 'Please activate your plan.');
+        /*
+        |--------------------------------------------------------------------------
+        | BLOCK INACTIVE ACCOUNT
+        |--------------------------------------------------------------------------
+        */
+        if (!$company->is_active) {
+            return redirect()->route('billing.locked');
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | BLOCK CANCELLED / EXPIRED / FAILED BILLING
+        |--------------------------------------------------------------------------
+        */
+        if (in_array($company->subscription_status, [
+            'cancelled',
+            'expired',
+            'past_due',
+            'unpaid',
+            'inactive'
+        ])) {
+            return redirect()->route('billing.locked');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ACTIVE USER CONTINUES
+        |--------------------------------------------------------------------------
+        */
         return $next($request);
     }
 }
+

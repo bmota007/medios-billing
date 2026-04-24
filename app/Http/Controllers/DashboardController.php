@@ -16,10 +16,18 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        // Force Houston Time for the greeting
+        $user = Auth::user();
+
+        // ✅ NEW POLISH:
+        // If Super Admin hits /dashboard send to admin dashboard
+        if ($user && $user->role === 'super_admin') {
+            return redirect()->route('admin.dashboard');
+        }
+
+        // Force Houston Time for greeting
         date_default_timezone_set('America/Chicago');
         $hour = date('H');
-        
+
         if ($hour < 12) {
             $greeting = 'Good Morning';
         } elseif ($hour < 17) {
@@ -28,31 +36,36 @@ class DashboardController extends Controller
             $greeting = 'Good Evening';
         }
 
-        $user = Auth::user();
         $company = $user->company;
 
         if (!$company) {
             return redirect('/login')->with('error', 'Company profile not found.');
         }
 
-        // 1. Stripe Success Logic (Activation)
+        // Stripe Success Logic
         if ($request->has('session_id') && $company->subscription_status === 'pending') {
             try {
                 Stripe::setApiKey(env('STRIPE_SECRET'));
+
                 $session = Session::retrieve($request->get('session_id'));
-                if ($session->payment_status === 'paid' || $session->payment_status === 'no_payment_required') {
+
+                if (
+                    $session->payment_status === 'paid' ||
+                    $session->payment_status === 'no_payment_required'
+                ) {
                     $company->update([
                         'subscription_status' => 'trialing',
                         'is_active' => true,
                         'stripe_customer_id' => $session->customer,
                     ]);
                 }
+
             } catch (\Exception $e) {
                 \Log::error("Stripe Activation Error: " . $e->getMessage());
             }
         }
 
-        // 2. Stats Calculation
+        // Stats
         $stats = [
             'total_revenue' => Invoice::where('company_id', $company->id)->where('status', 'paid')->sum('total'),
             'total_invoices' => Invoice::where('company_id', $company->id)->count(),
@@ -60,8 +73,9 @@ class DashboardController extends Controller
             'pending_invoices' => Invoice::where('company_id', $company->id)->where('status', 'pending')->count(),
         ];
 
-        // 3. Graph Data (Monthly Revenue)
+        // Graph
         $chartData = array_fill(0, 12, 0);
+
         try {
             $monthlyRevenue = Invoice::where('company_id', $company->id)
                 ->where('status', 'paid')
@@ -73,19 +87,33 @@ class DashboardController extends Controller
             foreach ($monthlyRevenue as $data) {
                 $chartData[$data->month - 1] = (float) $data->aggregate;
             }
+
         } catch (\Exception $e) {
             \Log::error("Graph Data Error: " . $e->getMessage());
         }
 
-        // 4. Recent Invoices
+        // Recent invoices
         $recentInvoices = Invoice::where('company_id', $company->id)
             ->latest()
             ->take(5)
             ->get();
 
         $currentSecret = $company->stripe_secret_key ?? env('STRIPE_SECRET');
-        $stripeStatus = str_contains($currentSecret, 'sk_live') ? 'LIVE' : 'TEST';
 
-        return view('dashboard', compact('stats', 'chartData', 'recentInvoices', 'company', 'stripeStatus', 'greeting'));
+        $stripeStatus = str_contains($currentSecret, 'sk_live')
+            ? 'LIVE'
+            : 'TEST';
+
+        return view(
+            'dashboard',
+            compact(
+                'stats',
+                'chartData',
+                'recentInvoices',
+                'company',
+                'stripeStatus',
+                'greeting'
+            )
+        );
     }
 }

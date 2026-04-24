@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Stripe\Stripe;
 use Stripe\Checkout\Session as StripeSession;
+use App\Services\TelnyxService; // ✅ Verified Import
 
 /*
 |--------------------------------------------------------------------------
@@ -28,14 +29,12 @@ class InvoiceController extends Controller
             ->where('invoice_no', $invoice_no)
             ->firstOrFail();
 
-        // 🚫 BLOCK ACCESS IF ALREADY PAID
         if ($invoice->status === 'paid') {
             return redirect()->route('invoice.public_view', $invoice_no)
                 ->with('error', 'This invoice has already been paid.');
         }
 
         $items = json_decode($invoice->items, true) ?? [];
-
         return view('invoice.payment', compact('invoice', 'items'));
     }
 
@@ -54,7 +53,6 @@ class InvoiceController extends Controller
 
         if ($request->has('search') && $request->get('search') !== '') {
             $search = $request->get('search');
-
             $query->where(function ($q) use ($search) {
                 $q->where('customer_name', 'LIKE', "%{$search}%")
                   ->orWhere('customer_email', 'LIKE', "%{$search}%")
@@ -63,8 +61,28 @@ class InvoiceController extends Controller
         }
 
         $invoices = $query->latest()->paginate(15);
-
         return view('invoice.history', compact('invoices'));
+    }
+
+    /**
+     * ✅ FIX: Manual SMS trigger from History/View
+     */
+    public function sendInvoiceSms($id)
+    {
+        $invoice = \App\Models\Invoice::findOrFail($id);
+        $phone = $invoice->customer_phone ?? $invoice->customer->phone ?? null;
+
+        if (!$phone) {
+            return back()->with('error', 'Customer has no phone number.');
+        }
+
+        $message = "Hello {$invoice->customer_name}, your invoice #{$invoice->invoice_no} is ready. Total: $" . number_format($invoice->total, 2);
+        $message .= "\nView here: " . route('invoice.public_view', $invoice->invoice_no);
+
+        $sms = new TelnyxService();
+        $sms->sendSms($phone, $message);
+
+        return back()->with('success', 'SMS sent successfully!');
     }
 
     public function view($id_or_no)
@@ -79,7 +97,6 @@ class InvoiceController extends Controller
         }
 
         $items = json_decode($invoice->items, true) ?? [];
-
         return view('invoice.public_view', compact('invoice', 'items'));
     }
 
@@ -102,7 +119,6 @@ class InvoiceController extends Controller
     {
         $invoice = Invoice::with('company')->findOrFail($id);
         $items = json_decode($invoice->items, true) ?? [];
-
         $html = view('invoice.public_view', compact('invoice', 'items'))->render();
 
         return response($html)
@@ -120,125 +136,117 @@ class InvoiceController extends Controller
         return view('invoice.edit', compact('invoice', 'customers', 'company'));
     }
 
-public function send(Request $request)
-{
-    $user = auth()->user();
-    $company = $user->company;
+    public function send(Request $request)
+    {
+        $user = auth()->user();
+        $company = $user->company;
 
-    $invoice = new Invoice();
-    $invoice->company_id = $company->id;
-    $invoice->customer_name = $request->customer_name;
-    $invoice->customer_email = $request->customer_email;
-    $invoice->customer_phone = $request->customer_phone;
+        $invoice = new Invoice();
+        $invoice->company_id = $company->id;
+        $invoice->customer_name = $request->customer_name;
+        $invoice->customer_email = $request->customer_email;
+        $invoice->customer_phone = $request->customer_phone;
+        $invoice->invoice_date = $request->invoice_date;
+        $invoice->due_date = $request->due_date;
+        $invoice->remaining_due_date = $request->remaining_due_date;
+        $invoice->invoice_no = 'INV-' . time();
 
-    $invoice->invoice_date = $request->invoice_date;
-    $invoice->due_date = $request->due_date;
-    $invoice->remaining_due_date = $request->remaining_due_date;
-    $invoice->invoice_no = 'INV-' . time();
+        $items = is_array($request->items) ? $request->items : [];
+        $invoice->items = json_encode($items);
 
-    $items = is_array($request->items) ? $request->items : [];
-    $invoice->items = json_encode($items);
+        $subtotal = 0;
+        foreach ($items as $item) {
+            $subtotal += ((float)$item['qty']) * ((float)$item['price']);
+        }
 
-    $subtotal = 0;
-    foreach ($items as $item) {
-        $subtotal += ((float)$item['qty']) * ((float)$item['price']);
-    }
+        $taxPercent = (float)$request->tax_percent;
+        $taxAmount = $subtotal * ($taxPercent / 100);
+        $total = $subtotal + $taxAmount;
 
-    $taxPercent = (float)$request->tax_percent;
-    $taxAmount = $subtotal * ($taxPercent / 100);
-    $total = $subtotal + $taxAmount;
+        $depositPercent = (float)$request->deposit_percent;
+        $depositAmount = $total * ($depositPercent / 100);
+        $remainingBalance = $total - $depositAmount;
 
-    $depositPercent = (float)$request->deposit_percent;
-    $depositAmount = $total * ($depositPercent / 100);
-    $remainingBalance = $total - $depositAmount;
-
-    $invoice->subtotal_amount = $subtotal;
-    $invoice->tax_percent = $taxPercent;
-    $invoice->tax_amount = $taxAmount;
-    $invoice->deposit_percent = $depositPercent;
-    $invoice->deposit_amount = $depositAmount;
-    $invoice->remaining_balance = $remainingBalance;
-    $invoice->auto_charge_enabled = $request->has('auto_charge_enabled');
-    $invoice->total = $total;
-    $invoice->status = 'pending';
-
-    $invoice->save();
-
-    return redirect()->route('invoice.view', $invoice->invoice_no)
-        ->with('success', 'Invoice created. Review before sending.');
-}    // your existing send() code here...
-
-public function update(Request $request, $id)
-{
-
-    $invoice = Invoice::findOrFail($id);
-
-    // 🔒 SECURITY CHECK
-    if ((int)$invoice->company_id !== (int)auth()->user()->company_id) {
-        abort(403);
-    }
-
-    // 🚫 BLOCK EDIT IF FULLY PAID
-    if ($invoice->status === 'paid') {
-        return back()->with('error', 'Cannot edit a fully paid invoice.');
-    }
-
-    // BASIC INFO
-    $invoice->customer_name = $request->customer_name;
-    $invoice->customer_email = $request->customer_email;
-    $invoice->customer_phone = $request->customer_phone;
-
-    $invoice->invoice_date = $request->invoice_date;
-    $invoice->due_date = $request->due_date;
-    $invoice->remaining_due_date = $request->remaining_due_date;
-
-    // ITEMS
-    $items = is_array($request->items) ? $request->items : [];
-    $invoice->items = json_encode($items);
-
-    // CALCULATIONS
-    $subtotal = 0;
-    foreach ($items as $item) {
-        $qty = (float) ($item['qty'] ?? 0);
-        $price = (float) ($item['price'] ?? 0);
-        $subtotal += $qty * $price;
-    }
-
-    $taxPercent = (float) ($request->tax_percent ?? 0);
-    $taxAmount = $subtotal * ($taxPercent / 100);
-    $total = $subtotal + $taxAmount;
-
-    $depositPercent = (float) ($request->deposit_percent ?? 0);
-    $depositAmount = $total * ($depositPercent / 100);
-
-    // 🔥 CRITICAL (KEEP PAYMENTS SAFE)
-    $amountPaid = (float) ($invoice->amount_paid ?? 0);
-    $remainingBalance = max($total - $amountPaid, 0);
-
-    // STATUS LOGIC
-    if ($amountPaid <= 0) {
+        $invoice->subtotal_amount = $subtotal;
+        $invoice->tax_percent = $taxPercent;
+        $invoice->tax_amount = $taxAmount;
+        $invoice->deposit_percent = $depositPercent;
+        $invoice->deposit_amount = $depositAmount;
+        $invoice->remaining_balance = $remainingBalance;
+        $invoice->auto_charge_enabled = $request->has('auto_charge_enabled');
+        $invoice->total = $total;
         $invoice->status = 'pending';
-    } elseif ($remainingBalance > 0) {
-        $invoice->status = 'partial';
-    } else {
-        $invoice->status = 'paid';
+
+        $invoice->save();
+
+        return redirect()->route('invoice.view', $invoice->invoice_no)
+            ->with('success', 'Invoice created. Review before sending.');
     }
 
-    // SAVE
-    $invoice->subtotal_amount = $subtotal;
-    $invoice->tax_percent = $taxPercent;
-    $invoice->tax_amount = $taxAmount;
-    $invoice->deposit_percent = $depositPercent;
-    $invoice->deposit_amount = $depositAmount;
-    $invoice->remaining_balance = $remainingBalance;
-    $invoice->total = $total;
+    public function update(Request $request, $id)
+    {
+        $invoice = Invoice::findOrFail($id);
 
-    $invoice->save();
+        if ((int)$invoice->company_id !== (int)auth()->user()->company_id) {
+            abort(403);
+        }
 
-    return redirect()->route('invoice.view', $invoice->invoice_no)
-        ->with('success', 'Invoice updated successfully.');
-}
+        if ($invoice->status === 'paid') {
+            return back()->with('error', 'Cannot edit a fully paid invoice.');
+        }
 
+        $invoice->customer_name = $request->customer_name;
+        $invoice->customer_email = $request->customer_email;
+        $invoice->customer_phone = $request->customer_phone;
+        $invoice->invoice_date = $request->invoice_date;
+        $invoice->due_date = $request->due_date;
+        $invoice->remaining_due_date = $request->remaining_due_date;
+
+        $items = is_array($request->items) ? $request->items : [];
+        $invoice->items = json_encode($items);
+
+        $subtotal = 0;
+        foreach ($items as $item) {
+            $qty = (float) ($item['qty'] ?? 0);
+            $price = (float) ($item['price'] ?? 0);
+            $subtotal += $qty * $price;
+        }
+
+        $taxPercent = (float) ($request->tax_percent ?? 0);
+        $taxAmount = $subtotal * ($taxPercent / 100);
+        $total = $subtotal + $taxAmount;
+
+        $depositPercent = (float) ($request->deposit_percent ?? 0);
+        $depositAmount = $total * ($depositPercent / 100);
+
+        $amountPaid = (float) ($invoice->amount_paid ?? 0);
+        $remainingBalance = max($total - $amountPaid, 0);
+
+        if ($amountPaid <= 0) {
+            $invoice->status = 'pending';
+        } elseif ($remainingBalance > 0) {
+            $invoice->status = 'partial';
+        } else {
+            $invoice->status = 'paid';
+        }
+
+        $invoice->subtotal_amount = $subtotal;
+        $invoice->tax_percent = $taxPercent;
+        $invoice->tax_amount = $taxAmount;
+        $invoice->deposit_percent = $depositPercent;
+        $invoice->deposit_amount = $depositAmount;
+        $invoice->remaining_balance = $remainingBalance;
+        $invoice->total = $total;
+
+        $invoice->save();
+
+        return redirect()->route('invoice.view', $invoice->invoice_no)
+            ->with('success', 'Invoice updated successfully.');
+    }
+
+    /**
+     * ✅ FIX: Main Dispatch (Email + SMS)
+     */
     public function sendEmail($invoice_no)
     {
         $invoice = Invoice::with('company')->where('invoice_no', $invoice_no)->firstOrFail();
@@ -251,7 +259,10 @@ public function update(Request $request, $id)
             if ($invoice->customer_phone) {
                 $message = "Hi {$invoice->customer_name}, your invoice #{$invoice->invoice_no} is ready.\n";
                 $message .= route('invoice.public_view', $invoice->invoice_no);
-                app(\App\Services\SmsService::class)->send($invoice->customer_phone, $message);
+                
+                // Switch from SmsService to TelnyxService
+                $sms = new TelnyxService();
+                $sms->sendSms($invoice->customer_phone, $message);
             }
 
             if ($invoice->status === 'pending') {
@@ -265,10 +276,16 @@ public function update(Request $request, $id)
         }
     }
 
+    /**
+     * ✅ FIX: Direct SMS Send logic
+     */
     public function sendSms(Request $request, $invoice_no)
     {
         $invoice = Invoice::where('invoice_no', $invoice_no)->firstOrFail();
-        app(\App\Services\SmsService::class)->send($request->phone, $request->message);
+        
+        $sms = new TelnyxService();
+        $sms->sendSms($request->phone, $request->message);
+        
         return response()->json(['success' => true]);
     }
 
@@ -285,9 +302,9 @@ public function update(Request $request, $id)
         $invoice = Invoice::with('company')->where('invoice_no', $invoice_no)->firstOrFail();
         \Stripe\Stripe::setApiKey($invoice->company->stripe_secret_key);
 
-$amountToCharge = ($invoice->deposit_amount > 0 && ($invoice->amount_paid ?? 0) == 0)
-    ? $invoice->deposit_amount
-    : ($invoice->remaining_balance ?? $invoice->total);
+        $amountToCharge = ($invoice->deposit_amount > 0 && ($invoice->amount_paid ?? 0) == 0)
+            ? $invoice->deposit_amount
+            : ($invoice->remaining_balance ?? $invoice->total);
 
         $baseUrl = config('app.url');
 
@@ -313,7 +330,7 @@ $amountToCharge = ($invoice->deposit_amount > 0 && ($invoice->amount_paid ?? 0) 
     {
         $invoice = Invoice::with('company')->where('invoice_no', $invoice_no)->firstOrFail();
 
-$amountPaidNow = ($invoice->deposit_amount > 0 && ($invoice->amount_paid ?? 0) == 0)
+        $amountPaidNow = ($invoice->deposit_amount > 0 && ($invoice->amount_paid ?? 0) == 0)
             ? $invoice->deposit_amount
             : ($invoice->remaining_balance ?? $invoice->total);
 
@@ -392,4 +409,4 @@ $amountPaidNow = ($invoice->deposit_amount > 0 && ($invoice->amount_paid ?? 0) =
         $invoice = Invoice::where('invoice_no', $invoice_no)->firstOrFail();
         return view('invoice.payment_success', compact('invoice'));
     }
-} // <--- THIS WAS THE MISSING BRACKET
+}

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use App\Models\SubscriptionInvoice;
+use App\Helpers\StripeHelper;
 use Stripe\Stripe;
 use Stripe\Customer;
 use Stripe\Subscription;
@@ -19,7 +20,9 @@ class BillingController extends Controller
 
     public function processSubscription(Request $request)
     {
-        Stripe::setApiKey(env('STRIPE_SECRET'));
+        // SYSTEM BILLING = MEDIOS BILLING PLATFORM BILLING
+        $stripe = StripeHelper::forSystem();
+        Stripe::setApiKey($stripe['secret']);
 
         try {
             $user = Auth::user();
@@ -33,10 +36,10 @@ class BillingController extends Controller
                 return back()->with('error', 'Payment token missing. Please try again.');
             }
 
-            $priceId = env('STRIPE_PRICE_ID');
+            $priceId = $stripe['price_id'];
 
             if (!$priceId) {
-                return back()->with('error', 'Stripe price ID is missing in .env');
+                return back()->with('error', 'Stripe price ID is missing.');
             }
 
             // Create or reuse Stripe customer
@@ -87,7 +90,7 @@ class BillingController extends Controller
                 'is_active'               => true,
             ]);
 
-            // Create internal SaaS billing record
+            // Internal SaaS billing record
             SubscriptionInvoice::create([
                 'company_id'         => $company->id,
                 'invoice_no'         => 'MB-' . strtoupper(Str::random(6)),

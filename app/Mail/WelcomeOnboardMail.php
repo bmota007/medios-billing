@@ -26,7 +26,9 @@ class WelcomeOnboardMail extends Mailable
      */
     public function build()
     {
-        return $this->subject('Welcome to the Platform - Account Activated')
+        $plan = $this->company->plan_name ?? $this->company->plan ?? 'Starter';
+
+        return $this->subject('Welcome to Medios Billing – Your ' . $plan . ' Plan Is Active')
                     ->view('emails.welcome-onboard');
     }
 }

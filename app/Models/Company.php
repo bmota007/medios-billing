@@ -37,26 +37,37 @@ class Company extends Model
         'mrr',
         'industry',
 
-        // STRIPE INTEGRATION (Synced with Controller & Settings)
+        // STRIPE
         'stripe_mode',
         'stripe_publishable_key',
         'stripe_secret_key',
-        'stripe_test_publishable_key', // Added this to match DB
+        'stripe_test_publishable_key',
         'stripe_test_secret_key',
         'stripe_webhook_secret',
         'stripe_test_public_key',
         'stripe_test_webhook_secret',
 
-        // LEGACY STRIPE FIELDS
+        // LEGACY STRIPE
         'client_stripe_key',
         'client_stripe_secret',
         'client_stripe_webhook_secret',
 
-        // CONTRACT FIELDS
+        // LEGACY CONTRACT
         'contract_template_path',
         'contract_template_type',
+        'contract_terms',
 
-        // PAYMENT METHODS & TOGGLES
+        // NEW MULTI-CONTRACT LIBRARY
+        'contract_1_name',
+        'contract_1_path',
+        'contract_2_name',
+        'contract_2_path',
+        'contract_3_name',
+        'contract_3_path',
+        'contract_4_name',
+        'contract_4_path',
+
+        // PAYMENT METHODS
         'accept_card',
         'accept_check',
         'accept_cash',
@@ -80,8 +91,6 @@ class Company extends Model
         'accept_cash' => 'boolean',
         'accept_zelle' => 'boolean',
         'accept_venmo' => 'boolean',
-        
-        // Removed 'encrypted' cast for now to ensure the Webhook can read the string directly
     ];
 
     public function users() { return $this->hasMany(User::class); }

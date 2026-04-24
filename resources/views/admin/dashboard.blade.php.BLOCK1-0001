@@ -561,68 +561,33 @@
                 <h3>Platform At a Glance</h3>
             </div>
 
-<div class="mb-glance-grid">
+            <div class="mb-glance-grid">
 
-    <div class="mb-glance-item">
-        <span>Total Tenants</span>
-        <strong>{{ $totalCompanies ?? 0 }}</strong>
-        <small>Active companies</small>
-    </div>
+                <div class="mb-glance-item">
+                    <span>Total Tenants</span>
+                    <strong>{{ $totalCompanies ?? 0 }}</strong>
+                    <small>Active companies</small>
+                </div>
 
-    <div class="mb-glance-item">
-        <span>MRR</span>
-        <strong>${{ number_format($mrr ?? 0,0) }}</strong>
-        <small>Monthly recurring</small>
-    </div>
+                <div class="mb-glance-item">
+                    <span>MRR</span>
+                    <strong>${{ number_format($mrr ?? 0,0) }}</strong>
+                    <small>Monthly recurring</small>
+                </div>
 
-    <div class="mb-glance-item">
-        <span>Growth Rate</span>
-        <strong class="up">{{ number_format($growthRate ?? 0,1) }}%</strong>
-        <small>vs last month</small>
-    </div>
+                <div class="mb-glance-item">
+                    <span>Growth Rate</span>
+                    <strong class="up">{{ number_format($growthRate ?? 0,1) }}%</strong>
+                    <small>vs last month</small>
+                </div>
 
-    <div class="mb-glance-item">
-        <span>Churn Rate</span>
-        <strong class="down">{{ number_format($churnRate ?? 0,1) }}%</strong>
-        <small>This month</small>
-    </div>
+                <div class="mb-glance-item">
+                    <span>Churn Rate</span>
+                    <strong class="down">{{ number_format($churnRate ?? 0,1) }}%</strong>
+                    <small>This month</small>
+                </div>
 
-</div>
-
-<div class="mb-leads-box">
-
-    <div class="mb-leads-head">
-        <h4>Future Lead Prospects</h4>
-<a href="#" onclick="openLeadModal(); return false;">+ Add Lead</a>
-    </div>
-
-<div class="mb-leads-grid">
-
-    <div class="mb-lead-stat">
-        <strong>{{ $newLeadsCount ?? 0 }}</strong>
-        <span>New Leads</span>
-    </div>
-
-    <div class="mb-lead-stat">
-        <strong>{{ $quotesSentCount ?? 0 }}</strong>
-        <span>Quotes Sent</span>
-    </div>
-
-    <div class="mb-lead-stat">
-        <strong>${{ number_format($pipelineValue ?? 0, 2) }}</strong>
-        <span>Pipeline Value</span>
-    </div>
-
-    <div class="mb-lead-stat">
-        <strong>{{ $followUpsCount ?? 0 }}</strong>
-        <span>Follow Ups</span>
-    </div>
-
-</div>
-
-    <a href="#" class="mb-panel-link">View All Prospects <i class="fa-solid fa-arrow-right"></i></a>
-
-</div>
+            </div>
 
         </div>
         {{-- RECENT ACTIVITY --}}
@@ -746,39 +711,6 @@
 
     </div>
 
-<div class="mb-modal-overlay" id="leadModal">
-
-    <div class="mb-modal-box">
-
-        <div class="mb-modal-head">
-            <h3>Add New Lead</h3>
-            <button onclick="closeLeadModal()">×</button>
-        </div>
-
-<form method="POST" action="{{ route('admin.leads.store') }}" class="mb-modal-body">
-    @csrf
-
-    <input type="text" name="business_name" placeholder="Business Name" required>
-    <input type="text" name="contact_name" placeholder="Contact Person">
-    <input type="email" name="email" placeholder="Email">
-    <input type="text" name="phone" placeholder="Phone">
-    <input type="text" name="source" placeholder="Source (Facebook, Website, Referral, etc.)">
-    <input type="number" step="0.01" min="0" name="value" placeholder="Potential Value">
-    <input type="date" name="follow_up_date">
-
-    <textarea name="notes" placeholder="Notes"></textarea>
-
-    <input type="hidden" name="status" value="new">
-
-    <div class="mb-modal-actions">
-        <button type="button" class="cancel-btn" onclick="closeLeadModal()">Cancel</button>
-        <button type="submit" class="save-btn">Save Lead</button>
-    </div>
-</form>
-
-    </div>
-
-</div>
     {{-- FOOTER --}}
     <div class="mb-footer">
         © {{ now()->year }} Medios Billing. All rights reserved.
@@ -837,20 +769,18 @@
 }
 
 .mb-title{
-    font-size:28px;
-    line-height:1.08;
-    letter-spacing:-0.5px;
+    font-size:58px;
+    line-height:.94;
+    letter-spacing:-2px;
     margin:0;
-    font-weight:800;
-    color:#fff;
-    max-width:100%;
+    font-weight:900;
+    color:#ffffff;
 }
 
 .mb-subtitle{
-    font-size:15px;
-    margin-top:8px;
-    color:#94a3b8;
-    line-height:1.45;
+    font-size:18px;
+    margin-top:10px;
+    color:#8ea4c7;
 }
 
 .mb-pill{
@@ -878,16 +808,16 @@
 }
 
 .mb-pill-main{
-    font-size:18px;
-    font-weight:700;
-    line-height:1.3;
-    color:#fff;
+    font-size:24px;
+    font-weight:800;
+    line-height:1.2;
+    color:#ffffff;
 }
 
 .mb-pill-sub{
     font-size:14px;
-    margin-top:6px;
-    color:#94a3b8;
+    margin-top:8px;
+    color:#8ea4c7;
     line-height:1.4;
 }
 
@@ -899,14 +829,16 @@
 }
 
 .mb-kpi-card{
-    border-radius:22px;
-    padding:16px 18px;
-    min-height:238px;
+    border-radius:24px;
+    padding:22px;
+    min-height:290px;
     border:1px solid rgba(255,255,255,.06);
     background:
         radial-gradient(circle at top left, rgba(255,255,255,.03), transparent 30%),
-        linear-gradient(180deg,#0b1220 0%,#0a162e 100%);
-    box-shadow:0 12px 34px rgba(0,0,0,.24);
+        linear-gradient(180deg,#08111f 0%,#0a1630 100%);
+    box-shadow:0 18px 38px rgba(0,0,0,.26);
+    display:flex;
+    flex-direction:column;
 }
 
 .mb-kpi-head{
@@ -951,31 +883,30 @@
 }
 
 .mb-kpi-label{
-    margin-top:12px;
+    margin-top:18px;
     color:#cbd5e1;
     font-size:15px;
-    line-height:1.4;
 }
 
 .mb-kpi-value{
-    margin-top:8px;
+    margin-top:10px;
     color:#fff;
-    font-size:30px;
-    line-height:1.1;
-    font-weight:800;
-    letter-spacing:-0.5px;
+    font-size:54px;
+    line-height:1;
+    font-weight:900;
+    letter-spacing:-2px;
 }
 
 .mb-kpi-foot{
-    margin-top:8px;
-    color:#94a3b8;
+    margin-top:10px;
+    color:#8ea4c7;
     font-size:14px;
-    line-height:1.45;
 }
 
 .mb-mini-chart{
-    margin-top:12px;
-    height:48px;
+    margin-top:auto;
+    padding-top:16px;
+    height:74px;
 }
 
 /* =====================================================
@@ -991,15 +922,13 @@
 
 .mb-bottom-grid{
     display:grid;
-    grid-template-columns:1.35fr 1fr .95fr;
+    grid-template-columns:1.45fr 1fr .95fr;
     gap:18px;
-    margin-top:18px;
-    align-items:stretch;
 }
 
 .mb-panel{
     border-radius:24px;
-    padding:20px;
+    padding:24px;
     border:1px solid rgba(255,255,255,.06);
     background:
         radial-gradient(circle at top left, rgba(59,130,246,.05), transparent 26%),
@@ -1018,7 +947,7 @@
 .mb-panel-head h3{
     margin:0;
     color:#fff;
-    font-size:16px;
+    font-size:18px;
     font-weight:800;
 }
 
@@ -1143,19 +1072,13 @@
     flex-direction:column;
 }
 
-.mb-health-row{
-    display:flex;
-    justify-content:space-between;
-    gap:12px;
-    padding:14px 0;
-    border-bottom:1px solid rgba(255,255,255,.05);
-}
+.mb-health-row,
 .mb-activity-row{
     display:flex;
     justify-content:space-between;
     gap:12px;
     padding:14px 0;
-    border-bottom:1px solid rgba(255,255,255,.05);
+    border-bottom:1px solid rgba(255,255,255,.06);
 }
 
 .mb-health-row.no-border,
@@ -1175,7 +1098,6 @@
 .mb-health-row strong{
     color:#fff;
     font-size:14px;
-    font-weight:700;
 }
 
 .mb-health-row strong.ok{color:#22c55e;}
@@ -1196,13 +1118,12 @@
 .mb-activity-title{
     color:#e5eefb;
     font-size:14px;
-    line-height:1.42;
 }
 
 .mb-activity-time{
     margin-top:4px;
     color:#94a3b8;
-    font-size:12px;
+    font-size:13px;
 }
 
 .mb-empty-state{
@@ -1218,29 +1139,21 @@
 .mb-command-grid{
     display:grid;
     grid-template-columns:repeat(6,minmax(0,1fr));
-    gap:18px;
-    margin-top:10px;
+    gap:16px;
 }
 
 .mb-command-card{
-    border-radius:20px;
+    border-radius:18px;
     padding:18px 16px;
     text-decoration:none;
-    min-height:112px;
+    min-height:104px;
     display:grid;
-    grid-template-columns:50px 1fr 20px;
-    gap:13px;
+    grid-template-columns:50px 1fr 22px;
+    gap:14px;
     align-items:center;
     border:1px solid rgba(255,255,255,.06);
     background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.01));
-    transition:all .18s ease;
 }
-
-.mb-command-card:hover{
-    transform:translateY(-2px);
-    border-color:rgba(96,165,250,.22);
-}
-
 .mb-command-icon{
     width:50px;
     height:50px;
@@ -1267,15 +1180,12 @@
 
 .mb-command-body strong{
     color:#fff;
-    font-size:14px;
-    line-height:1.25;
-    font-weight:700;
+    font-size:15px;
 }
 
 .mb-command-body span{
     color:#94a3b8;
-    font-size:12px;
-    line-height:1.35;
+    font-size:13px;
 }
 
 .mb-command-arrow{
@@ -1292,15 +1202,13 @@
     grid-template-columns:repeat(4,1fr);
     border-radius:18px;
     overflow:hidden;
-    border:1px solid rgba(255,255,255,.05);
-    margin-top:10px;
+    border:1px solid rgba(255,255,255,.06);
 }
 
 .mb-glance-item{
-    padding:18px 16px;
-    border-right:1px solid rgba(255,255,255,.05);
-    background:rgba(255,255,255,.012);
-    min-height:118px;
+    padding:18px;
+    border-right:1px solid rgba(255,255,255,.06);
+    background:rgba(255,255,255,.015);
 }
 
 .mb-glance-item:last-child{
@@ -1310,16 +1218,15 @@
 .mb-glance-item span{
     display:block;
     color:#94a3b8;
-    font-size:12px;
+    font-size:13px;
     margin-bottom:10px;
 }
 
 .mb-glance-item strong{
     display:block;
     color:#fff;
-    font-size:18px;
+    font-size:24px;
     font-weight:800;
-    line-height:1.1;
 }
 
 .mb-glance-item strong.up{color:#22c55e;}
@@ -1330,181 +1237,6 @@
     margin-top:8px;
     color:#94a3b8;
     font-size:12px;
-    line-height:1.35;
-}
-
-/* =====================================================
-   FUTURE LEADS BOX
-===================================================== */
-
-.mb-leads-box{
-    margin-top:16px;
-    padding:16px;
-    border-radius:18px;
-    border:1px solid rgba(255,255,255,.05);
-    background:rgba(255,255,255,.012);
-}
-.mb-leads-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:12px;
-    margin-bottom:14px;
-    width:100%;
-}
-
-.mb-leads-head a{
-    margin-left:auto;
-    color:#ffffff;
-    text-decoration:none;
-    font-size:12px;
-    font-weight:700;
-    white-space:nowrap;
-    padding:8px 12px;
-    border-radius:10px;
-    border:1px solid rgba(96,165,250,.18);
-    background:
-        linear-gradient(180deg,rgba(59,130,246,.18),rgba(59,130,246,.08));
-    transition:all .18s ease;
-}
-
-.mb-leads-head a:hover{
-    transform:translateY(-1px);
-    border-color:rgba(96,165,250,.32);
-    box-shadow:0 8px 18px rgba(59,130,246,.12);
-}
-
-.mb-leads-head h4{
-    margin:0;
-    color:#fff;
-    font-size:15px;
-    font-weight:700;
-    line-height:1.2;
-}
-
-
-.mb-leads-grid{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:10px;
-}
-
-.mb-lead-stat{
-    padding:14px 14px 12px;
-    min-height:92px;
-    border-radius:14px;
-    border:1px solid rgba(255,255,255,.05);
-    background:
-        linear-gradient(180deg,rgba(255,255,255,.018),rgba(255,255,255,.01));
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    transition:all .18s ease;
-}
-
-.mb-lead-stat:hover{
-    transform:translateY(-2px);
-    border-color:rgba(96,165,250,.18);
-}
-
-.mb-lead-stat strong{
-    display:block;
-    color:#fff;
-    font-size:18px;
-    font-weight:800;
-    line-height:1.1;
-}
-
-.mb-lead-stat span{
-    display:block;
-    margin-top:4px;
-    color:#94a3b8;
-    font-size:12px;
-    line-height:1.35;
-}
-
-/* MODAL */
-
-.mb-modal-overlay{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,.65);
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index:9999;
-}
-
-.mb-modal-box{
-    width:520px;
-    max-width:95%;
-    border-radius:22px;
-    background:#0b1220;
-    border:1px solid rgba(255,255,255,.06);
-    padding:20px;
-    box-shadow:0 30px 80px rgba(0,0,0,.45);
-}
-
-.mb-modal-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:18px;
-}
-
-.mb-modal-head h3{
-    margin:0;
-    color:#fff;
-    font-size:18px;
-}
-
-.mb-modal-head button{
-    background:none;
-    border:none;
-    color:#94a3b8;
-    font-size:26px;
-    cursor:pointer;
-}
-
-.mb-modal-body input,
-.mb-modal-body textarea{
-    width:100%;
-    margin-bottom:12px;
-    padding:12px 14px;
-    border-radius:12px;
-    border:1px solid rgba(255,255,255,.06);
-    background:#111827;
-    color:#fff;
-}
-
-.mb-modal-body textarea{
-    min-height:110px;
-    resize:none;
-}
-
-.mb-modal-actions{
-    display:flex;
-    justify-content:flex-end;
-    gap:10px;
-}
-
-.cancel-btn,
-.save-btn{
-    padding:10px 14px;
-    border-radius:10px;
-    border:none;
-    font-weight:700;
-    cursor:pointer;
-}
-
-.cancel-btn{
-    background:#1f2937;
-    color:#fff;
-}
-
-.save-btn{
-    background:#2563eb;
-    color:#fff;
 }
 
 /* =====================================================
@@ -1512,19 +1244,18 @@
 ===================================================== */
 
 .mb-footer{
-    margin-top:14px;
+    margin-top:20px;
     text-align:center;
     color:#94a3b8;
-    font-size:13px;
+    font-size:14px;
     position:relative;
-    padding-bottom:6px;
 }
 
 .mb-version{
     position:absolute;
     right:0;
     color:#64748b;
-    font-size:12px;
+    font-size:13px;
 }
 
 /* =====================================================
@@ -1713,14 +1444,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
     });
- window.openLeadModal = function(){
-        document.getElementById('leadModal').style.display='flex';
-    }
-
-    window.closeLeadModal = function(){
-        document.getElementById('leadModal').style.display='none';
-    }
-
 
 });
 </script>

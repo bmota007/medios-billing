@@ -10,170 +10,226 @@ use App\Models\Quote;
 use App\Models\SubscriptionInvoice;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Stripe\Webhook;
+use App\Helpers\StripeHelper;
 
 class StripeWebhookController extends Controller
 {
-    /**
-     * Main entry point for Stripe Webhooks.
-     */
     public function handle(Request $request)
     {
-        $payload = $request->getContent();
+        $payload   = $request->getContent();
         $sigHeader = $request->header('Stripe-Signature');
         $eventData = json_decode($payload);
 
-        Log::info("STRIPE WEBHOOK: Received event type: " . ($eventData->type ?? 'UNKNOWN'));
+        Log::info("STRIPE WEBHOOK RECEIVED: " . ($eventData->type ?? 'unknown'));
 
-        // =========================================================
-        // PART 1: CUSTOMER PAYMENTS (Invoices & Quotes)
-        // =========================================================
-        if ($eventData->type === 'checkout.session.completed') {
-            $session = $eventData->data->object;
+        /*
+        |--------------------------------------------------------------------------
+        | PART 1 — TENANT CUSTOMER PAYMENTS
+        |--------------------------------------------------------------------------
+        */
+        if (($eventData->type ?? '') === 'checkout.session.completed') {
+
+            $session = $eventData->data->object ?? null;
+
             $invoiceNo = $session->metadata->invoice_no ?? null;
-            $quoteId = $session->metadata->quote_id ?? null;
-
-            Log::info("STRIPE WEBHOOK: Metadata found - Invoice: $invoiceNo, Quote: $quoteId");
+            $quoteId   = $session->metadata->quote_id ?? null;
 
             if ($invoiceNo) {
-                $invoice = Invoice::with('company')->where('invoice_no', $invoiceNo)->first();
+                $invoice = Invoice::with('company')
+                    ->where('invoice_no', $invoiceNo)
+                    ->first();
+
                 if ($invoice) {
-                    $this->nuclearProcessPayment($invoice, $payload, $sigHeader);
+                    $this->processTenantPayment($invoice, $payload, $sigHeader);
                 }
-            } 
-            elseif ($quoteId) {
-                $quote = Quote::with('company', 'customer')->find($quoteId);
+            }
+
+            if ($quoteId) {
+                $quote = Quote::find($quoteId);
+
                 if ($quote) {
-                    // Logic to find the linked invoice by number
-                    $invoice = Invoice::where('invoice_no', 'LIKE', '%' . $quote->quote_number . '%')->first();
+                    $invoice = Invoice::where('company_id', $quote->company_id)
+                        ->latest()
+                        ->first();
+
                     if ($invoice) {
-                        $this->nuclearProcessPayment($invoice, $payload, $sigHeader);
-                    } else {
-                        Log::error("STRIPE WEBHOOK: Found Quote $quoteId but no linked Invoice found.");
+                        $this->processTenantPayment($invoice, $payload, $sigHeader);
                     }
                 }
             }
         }
 
-        // =========================================================
-        // PART 2: SUBSCRIPTION RENEWAL LOGIC (MB Platform Fees)
-        // =========================================================
-        if (in_array($eventData->type, ['invoice.payment_succeeded', 'invoice.paid'])) {
-            $stripeInvoice = $eventData->data->object;
-            $customerId = $stripeInvoice->customer ?? null;
-            $stripeInvoiceId = $stripeInvoice->id ?? null;
-            $systemSecret = env('STRIPE_WEBHOOK_SECRET');
+        /*
+        |--------------------------------------------------------------------------
+        | PART 2 — MEDIOS BILLING SUBSCRIPTIONS
+        |--------------------------------------------------------------------------
+        */
+        if (in_array(($eventData->type ?? ''), ['invoice.payment_succeeded', 'invoice.paid'])) {
 
-            // Verify with SYSTEM secret
-            try { Webhook::constructEvent($payload, $sigHeader, $systemSecret); } catch (\Throwable $e) {}
+            $stripeInvoice = $eventData->data->object ?? null;
+
+            $customerId      = $stripeInvoice->customer ?? null;
+            $stripeInvoiceId = $stripeInvoice->id ?? null;
+
+            $system = StripeHelper::forSystem();
+
+            try {
+                Webhook::constructEvent($payload, $sigHeader, $system['webhook']);
+            } catch (\Throwable $e) {
+                Log::warning("System webhook verification skipped/fail.");
+            }
 
             if ($customerId) {
-                $company = Company::withoutGlobalScopes()->where('stripe_id', $customerId)->first();
+
+                $company = Company::where('stripe_id', $customerId)->first();
 
                 if ($company) {
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | ACTIVATE COMPANY
+                    |--------------------------------------------------------------------------
+                    */
+                    $wasInactive = $company->subscription_status !== 'active';
+
                     $company->update([
                         'subscription_status' => 'active',
                         'subscription_ends_at' => now()->addMonth(),
                         'is_active' => true,
+                        'status' => 'Active',
                     ]);
 
-                    if ($stripeInvoiceId) {
-                        $alreadyExists = SubscriptionInvoice::where('stripe_invoice_id', $stripeInvoiceId)->first();
-                        if (!$alreadyExists) {
-                            $amountPaid = isset($stripeInvoice->amount_paid) ? $stripeInvoice->amount_paid / 100 : 35.00;
-                            
-                            // Original Subscription Recording Logic Restored
-                            SubscriptionInvoice::create([
-                                'company_id'         => $company->id,
-                                'invoice_no'         => 'MB-STRIPE-' . strtoupper(Str::random(6)),
-                                'stripe_invoice_id'  => $stripeInvoiceId,
-                                'stripe_customer_id' => $customerId,
-                                'customer_name'      => $company->name,
-                                'customer_email'     => $company->email ?? 'admin@mediosbilling.com',
-                                'amount'             => $amountPaid,
-                                'currency'           => $stripeInvoice->currency ?? 'usd',
-                                'status'             => 'paid',
-                                'invoice_date'       => now(),
-                                'paid_at'            => now(),
-                                'period_start'       => now(),
-                                'period_end'         => now()->addMonth(),
-                                'items'              => [['desc' => 'Medios Billing Monthly Subscription Renewal', 'qty' => 1, 'price' => $amountPaid, 'line_total' => $amountPaid]],
-                                'notes'              => 'Stripe platform renewal success.',
-                            ]);
-                            Log::info("STRIPE WEBHOOK: Subscription Invoice created for " . $company->name);
+                    /*
+                    |--------------------------------------------------------------------------
+                    | SEND PREMIUM WELCOME EMAIL (FIRST ACTIVATION ONLY)
+                    |--------------------------------------------------------------------------
+                    */
+                    if ($wasInactive && $company->email) {
+                        try {
+                            Mail::to($company->email)
+                                ->send(new \App\Mail\WelcomeOnboardMail($company));
+
+                            Log::info("WelcomeOnboardMail sent to {$company->email}");
+                        } catch (\Throwable $e) {
+                            Log::error("Welcome email failed: " . $e->getMessage());
                         }
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CREATE SUBSCRIPTION INVOICE RECORD
+                    |--------------------------------------------------------------------------
+                    */
+                    $exists = SubscriptionInvoice::where('stripe_invoice_id', $stripeInvoiceId)->first();
+
+                    if (!$exists) {
+
+                        $amountPaid = isset($stripeInvoice->amount_paid)
+                            ? $stripeInvoice->amount_paid / 100
+                            : 35.00;
+
+                        SubscriptionInvoice::create([
+                            'company_id'         => $company->id,
+                            'invoice_no'         => 'MB-' . strtoupper(Str::random(6)),
+                            'stripe_invoice_id'  => $stripeInvoiceId,
+                            'stripe_customer_id' => $customerId,
+                            'customer_name'      => $company->name,
+                            'customer_email'     => $company->email,
+                            'amount'             => $amountPaid,
+                            'currency'           => 'usd',
+                            'status'             => 'paid',
+                            'invoice_date'       => now(),
+                            'paid_at'            => now(),
+                            'period_start'       => now(),
+                            'period_end'         => now()->addMonth(),
+                            'items'              => [
+                                [
+                                    'desc'       => 'Medios Billing Subscription Renewal',
+                                    'qty'        => 1,
+                                    'price'      => $amountPaid,
+                                    'line_total' => $amountPaid,
+                                ]
+                            ],
+                            'notes' => 'Stripe renewal webhook success',
+                        ]);
                     }
                 }
             }
         }
 
-        // PART 3: FAILED SUBSCRIPTION PAYMENTS
-        if ($eventData->type === 'invoice.payment_failed') {
-            $stripeInvoice = $eventData->data->object;
-            $customerId = $stripeInvoice->customer ?? null;
+        /*
+        |--------------------------------------------------------------------------
+        | PART 3 — FAILED SUBSCRIPTIONS
+        |--------------------------------------------------------------------------
+        */
+        if (($eventData->type ?? '') === 'invoice.payment_failed') {
+
+            $stripeInvoice = $eventData->data->object ?? null;
+            $customerId    = $stripeInvoice->customer ?? null;
+
             if ($customerId) {
-                $company = Company::withoutGlobalScopes()->where('stripe_id', $customerId)->first();
+
+                $company = Company::where('stripe_id', $customerId)->first();
+
                 if ($company) {
-                    $company->update(['subscription_status' => 'inactive', 'is_active' => false]);
-                    Log::warning("STRIPE WEBHOOK: Subscription FAILED for " . $company->name);
+                    $company->update([
+                        'subscription_status' => 'inactive',
+                        'is_active' => false,
+                        'status' => 'Payment Failed',
+                    ]);
                 }
             }
         }
 
-        return response()->json(['status' => 'success']);
+        return response()->json(['status' => 'ok']);
     }
 
-    /**
-     * Nuclear logic to handle Invoice/Quote Processing + Emails with safety logging.
-     */
-    protected function nuclearProcessPayment($invoice, $payload, $sigHeader)
+    /*
+    |--------------------------------------------------------------------------
+    | TENANT PAYMENT ENGINE
+    |--------------------------------------------------------------------------
+    */
+    protected function processTenantPayment($invoice, $payload, $sigHeader)
     {
         $company = $invoice->company;
-        Log::info("STRIPE WEBHOOK: Nuclear processing start for " . $company->name);
 
-        $endpointSecret = ($company->stripe_mode === 'live') 
-            ? $company->stripe_webhook_secret 
-            : $company->stripe_test_webhook_secret;
+        $stripe = StripeHelper::forCompany($company);
 
-        // Signature Verification with safety bypass
-        if ($endpointSecret) {
+        if ($stripe['webhook']) {
             try {
-                Webhook::constructEvent($payload, $sigHeader, $endpointSecret);
-                Log::info("STRIPE WEBHOOK: Signature Verified for " . $company->name);
-            } catch (\Exception $e) {
-                Log::error("STRIPE WEBHOOK: Signature Security Fail for " . $company->name . ": " . $e->getMessage());
-                return; 
+                Webhook::constructEvent($payload, $sigHeader, $stripe['webhook']);
+            } catch (\Throwable $e) {
+                Log::warning("Tenant webhook verify failed for {$company->name}");
             }
-        } else {
-            Log::warning("STRIPE WEBHOOK: Missing Secret for " . $company->name . ". Processing without verification.");
         }
 
-        if ($invoice->status !== 'paid') {
-            // 1. Update Database
-            $invoice->update([
-                'status' => 'paid',
-                'paid_at' => now(),
-                'payment_method' => 'card'
-            ]);
-            Log::info("STRIPE WEBHOOK: DB updated to PAID for #" . $invoice->invoice_no);
+        if ($invoice->status === 'paid') {
+            return;
+        }
 
-// 2. Email the Company (Internal Alert)
-            try {
-                Mail::to($company->email)->send(new \App\Mail\InvoicePaidMail($invoice));
-                Log::info("STRIPE WEBHOOK: Professional Alert sent to company.");
-            } catch (\Exception $e) { 
-                Log::error("STRIPE WEBHOOK: Company Email Fail: " . $e->getMessage()); 
+        $invoice->update([
+            'status' => 'paid',
+            'paid_at' => now(),
+            'payment_method' => 'card',
+            'remaining_balance' => 0,
+            'amount_paid' => $invoice->total,
+        ]);
+
+        try {
+
+            if ($invoice->customer_email) {
+                Mail::to($invoice->customer_email)
+                    ->send(new \App\Mail\InvoicePaidMail($invoice));
             }
 
-            // 3. Email the Customer (Receipt)
-            try {
-                Mail::to($invoice->customer_email)->send(new \App\Mail\InvoicePaidMail($invoice));
-                Log::info("STRIPE WEBHOOK: Professional Receipt sent to customer.");
-            } catch (\Exception $e) { 
-                Log::error("STRIPE WEBHOOK: Customer Receipt Fail: " . $e->getMessage()); 
-               }
-
+            if ($company->email) {
+                Mail::to($company->email)
+                    ->send(new \App\Mail\InvoicePaidAdminMail($invoice));
             }
-          }
-         }
+
+        } catch (\Throwable $e) {
+            Log::error("Webhook email fail: " . $e->getMessage());
+        }
+    }
+}

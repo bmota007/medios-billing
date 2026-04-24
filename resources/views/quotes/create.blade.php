@@ -2,436 +2,627 @@
 
 @section('content')
 @php
-    /** * FIX #2: Safety check for items. 
-     * Using collect() to ensure we can map even if it's an array or object.
-     */
-    $defaultItems = !empty($quote->items) ? collect($quote->items)->map(function($item) {
-        return [
-            'service' => $item->service_name ?? ($item['service_name'] ?? ''),
-            'description' => $item->description ?? ($item['description'] ?? ''),
-            'qty' => $item->quantity ?? ($item['quantity'] ?? 1),
-            'price' => $item->unit_price ?? ($item['unit_price'] ?? 0),
-            'total' => $item->line_total ?? ($item['line_total'] ?? 0),
-        ];
-    })->toArray() : [
-        [
-            'service' => '',
-            'description' => '',
-            'qty' => 1,
-            'price' => 0,
-            'total' => 0,
-        ]
-    ];
+$defaultItems = !empty($quote->items)
+? collect($quote->items)->map(function($item){
+return [
+'service' => $item->service_name ?? ($item['service_name'] ?? ''),
+'description' => $item->description ?? ($item['description'] ?? ''),
+'qty' => $item->quantity ?? ($item['quantity'] ?? 1),
+'price' => $item->unit_price ?? ($item['unit_price'] ?? 0),
+'total' => $item->line_total ?? ($item['line_total'] ?? 0),
+];
+})->toArray()
+: [['service'=>'','description'=>'','qty'=>1,'price'=>0,'total'=>0]];
 
-    $oldItems = old('items', $defaultItems);
-    $oldDepositType = old('deposit_type', $quote->deposit_type ?? 'none');
+$oldItems = old('items', $defaultItems);
 @endphp
 
-<div class="container-fluid py-4">
-    {{-- PAGE HEADER --}}
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <div>
-            <h2 class="text-white fw-bold mb-1">
-                <i class="fa-solid fa-file-invoice me-2 text-primary"></i>
-                {{ isset($quote) ? 'Update Quote' : 'Create New Quote' }}
-            </h2>
-            <p class="text-secondary mb-0">Build a professional proposal with custom services and payment terms.</p>
-        </div>
-        <a href="{{ route('quotes.index') }}" class="btn btn-outline-light rounded-pill px-4">
-            <i class="fa-solid fa-arrow-left me-2"></i>Back to Quotes
-        </a>
+<div class="quote-shell">
+
+<div class="topbar">
+    <div>
+        <h2>{{ isset($quote) ? 'Update Quote' : 'Create New Quote' }}</h2>
+        <p>Build a professional proposal with custom services and payment terms.</p>
+        <a href="{{ route('quotes.index') }}" class="back-link">← Back to Quotes</a>
     </div>
 
-    @if ($errors->any())
-        <div class="alert alert-danger rounded-4 shadow-sm mb-4 border-0">
-            <div class="d-flex align-items-center mb-2">
-                <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                <strong>Please fix the following errors:</strong>
-            </div>
-            <ul class="mb-0 small">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
+    <button type="button" class="preview-btn">
+        <i class="fa fa-eye"></i> View Preview
+    </button>
+</div>
 
-    <form action="{{ isset($quote) ? route('quotes.update', $quote->id) : route('quotes.store') }}" method="POST" id="quoteForm" enctype="multipart/form-data">
-        @csrf
-        @if(isset($quote))
-            @method('PUT')
-        @endif
+<form action="{{ isset($quote) ? route('quotes.update',$quote->id) : route('quotes.store') }}" method="POST" id="quoteForm">
+@csrf
+@if(isset($quote))
+@method('PUT')
+@endif
 
-        <div class="card border-0 shadow-lg rounded-4 overflow-hidden quote-card">
-            <div class="card-body p-4 p-lg-5">
+<div class="builder-grid">
 
-                {{-- BLOCK 1: CUSTOMER & DATE INFO --}}
-                <div class="mb-5">
-                    <h5 class="text-primary fw-bold mb-4 uppercase small letter-spacing-1">
-                        <i class="fa-solid fa-user-tag me-2"></i> Client & Timeline Details
-                    </h5>
-                    <div class="row g-4">
-                        <div class="col-lg-6">
-                            <label for="customer_id" class="form-label text-white fw-semibold">Select Customer</label>
-                            <select name="customer_id" id="customer_id" class="form-select form-select-lg quote-input" required>
-                                <option value="">Choose a client...</option>
-                                @foreach($customers as $customer)
-                                    <option value="{{ $customer->id }}" {{ old('customer_id', $quote->customer_id ?? '') == $customer->id ? 'selected' : '' }}>
-                                        {{ $customer->name }}{{ $customer->email ? ' (' . $customer->email . ')' : '' }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
+{{-- LEFT SIDE --}}
+<div class="left-panel">
 
-                        <div class="col-lg-3">
-                            <label for="quote_date" class="form-label text-white fw-semibold">Quote Date</label>
-                            <input
-                                type="date"
-                                name="quote_date"
-                                id="quote_date"
-                                class="form-control form-control-lg quote-input quote-date-input"
-                                value="{{ old('quote_date', isset($quote->quote_date) ? \Carbon\Carbon::parse($quote->quote_date)->format('Y-m-d') : now()->format('Y-m-d')) }}"
-                            >
-                        </div>
+{{-- STEP 1 --}}
+<div class="card-premium">
+<div class="step-title"><span>1</span> Client & Timeline</div>
 
-                        <div class="col-lg-3">
-                            <label for="valid_until" class="form-label text-white fw-semibold">Expiration Date</label>
-                            <input
-                                type="date"
-                                name="valid_until"
-                                id="valid_until"
-                                class="form-control form-control-lg quote-input quote-date-input"
-                                value="{{ old('valid_until', isset($quote->valid_until) ? \Carbon\Carbon::parse($quote->valid_until)->format('Y-m-d') : now()->addDays(30)->format('Y-m-d')) }}"
-                            >
-                        </div>
-                    </div>
-                </div>
+<div class="row g-3">
+<div class="col-md-4">
+<label>Customer</label>
+<select name="customer_id" class="form-control premium-input" required>
+@foreach($customers as $customer)
+<option value="{{ $customer->id }}"
+{{ old('customer_id',$quote->customer_id ?? '') == $customer->id ? 'selected' : '' }}>
+{{ $customer->name }}
+</option>
+@endforeach
+</select>
+</div>
 
-                <hr class="my-5 border-secondary-subtle opacity-25">
+<div class="col-md-4">
+<label>Quote Date</label>
+<input type="date"
+name="quote_date"
+value="{{ old('quote_date', $quote->quote_date ?? date('Y-m-d')) }}"
+class="form-control premium-input">
+</div>
 
-                {{-- BLOCK 2: LINE ITEMS --}}
-                <div class="mb-5">
-                    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-                        <div>
-                            <h5 class="text-primary fw-bold mb-1 uppercase small letter-spacing-1">
-                                <i class="fa-solid fa-list-check me-2"></i> Service Items & Pricing
-                            </h5>
-                            <p class="text-secondary small mb-0">Define the services and pricing for this proposal.</p>
-                        </div>
-                        <button type="button" onclick="addItemRow()" class="btn btn-primary px-4 py-2 rounded-3 fw-semibold shadow-sm">
-                            <i class="fa-solid fa-plus me-2"></i>Add Line Item
-                        </button>
-                    </div>
+<div class="col-md-4">
+<label>Expiration Date</label>
+<input type="date"
+name="expiry_date"
+value="{{ old('expiry_date', $quote->expiry_date ?? date('Y-m-d', strtotime('+7 days'))) }}"
+class="form-control premium-input">
+</div>
+</div>
+</div>
 
-                    <div class="table-responsive">
-                        <table class="table align-middle quote-table" id="itemsTable">
-                            <thead>
-                                <tr>
-                                    <th style="min-width: 220px;">Service Name</th>
-                                    <th style="min-width: 260px;">Description</th>
-                                    <th style="width: 110px;">Qty</th>
-                                    <th style="width: 140px;">Unit Price</th>
-                                    <th style="width: 140px;">Line Total</th>
-                                    <th style="width: 80px;" class="text-center">Remove</th>
-                                </tr>
-                            </thead>
-                            <tbody id="quoteItemsBody">
-                                @foreach($oldItems as $index => $item)
-                                    <tr class="item-row">
-                                        <td>
-                                            <input type="text" name="items[{{ $index }}][service]" class="form-control quote-input item-service" value="{{ $item['service'] ?? '' }}" placeholder="e.g. Consultation">
-                                        </td>
-                                        <td>
-                                            <textarea name="items[{{ $index }}][description]" class="form-control quote-input item-description" rows="2" placeholder="Brief details...">{{ $item['description'] ?? '' }}</textarea>
-                                        </td>
-                                        <td>
-                                            <input type="number" step="1" min="0" name="items[{{ $index }}][qty]" class="form-control quote-input item-qty" value="{{ $item['qty'] ?? 1 }}" oninput="calculateRow(this)">
-                                        </td>
-                                        <td>
-                                            <div class="input-group">
-                                                <span class="input-group-text bg-transparent text-secondary border-end-0">$</span>
-                                                <input type="number" step="0.01" min="0" name="items[{{ $index }}][price]" class="form-control quote-input item-price border-start-0" value="{{ $item['price'] ?? 0 }}" oninput="calculateRow(this)">
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="input-group">
-                                                <span class="input-group-text bg-transparent text-secondary border-end-0">$</span>
-                                                <input type="number" step="0.01" min="0" name="items[{{ $index }}][total]" class="form-control quote-input item-total border-start-0" value="{{ $item['total'] ?? 0 }}" readonly>
-                                            </div>
-                                        </td>
-                                        <td class="text-center">
-                                            <button type="button" class="btn btn-link text-danger p-0" onclick="removeItemRow(this)">
-                                                <i class="fa-solid fa-circle-xmark fs-4"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+{{-- STEP 2 --}}
+<div class="card-premium">
+<div class="step-head">
+<div class="step-title m-0"><span>2</span> Service Items & Pricing</div>
 
-                    <div class="row justify-content-end mt-4">
-                        <div class="col-lg-4">
-                            <div class="totals-box rounded-4 p-4 shadow-sm">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-secondary small">Subtotal</span>
-                                    <span class="text-white fw-bold">$<span id="subtotal_display">0.00</span></span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-secondary small">Required Deposit</span>
-                                    <span class="text-warning fw-bold">$<span id="deposit_display">0.00</span></span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-3 pb-3 border-bottom border-secondary-subtle opacity-25">
-                                    <span class="text-secondary small">Remaining Balance</span>
-                                    <span class="text-info fw-bold">$<span id="remaining_display">0.00</span></span>
-                                </div>
+<button type="button" onclick="addItemRow()" class="btn-blue">
++ Add Line Item
+</button>
+</div>
 
-                                <input type="hidden" name="subtotal" id="subtotal" value="{{ old('subtotal', $quote->subtotal ?? 0) }}">
-                                <input type="hidden" name="total" id="total" value="{{ old('total', $quote->total ?? 0) }}">
+<div class="table-wrap">
+<table class="quote-table">
+<thead>
+<tr>
+<th>SERVICE</th>
+<th>DESCRIPTION</th>
+<th width="90">QTY</th>
+<th width="170">UNIT PRICE</th>
+<th width="160">LINE TOTAL</th>
+<th width="80">REMOVE</th>
+</tr>
+</thead>
 
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-white fw-bold">Grand Total</span>
-                                    <span class="text-primary fs-4 fw-bold">$<span id="total_display">0.00</span></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<tbody id="quoteItemsBody">
+@foreach($oldItems as $index => $item)
+<tr class="item-row">
+<td>
+<input type="text"
+name="items[{{ $index }}][service]"
+value="{{ $item['service'] }}"
+class="premium-input"
+required>
+</td>
 
-                <hr class="my-5 border-secondary-subtle opacity-25">
+<td>
+<input type="text"
+name="items[{{ $index }}][description]"
+value="{{ $item['description'] }}"
+class="premium-input">
+</td>
 
-                {{-- BLOCK 3: PAYMENT TERMS & AUTOMATION --}}
-                <div class="mb-5">
-                    <h5 class="text-primary fw-bold mb-4 uppercase small letter-spacing-1">
-                        <i class="fa-solid fa-hand-holding-dollar me-2"></i> Payment & Automation Settings
-                    </h5>
-                    <div class="row g-4">
-                        <div class="col-lg-4">
-                            <label class="form-label text-white fw-semibold">Deposit Structure</label>
-                            <select name="deposit_type" id="deposit_type" class="form-select form-select-lg quote-input" onchange="updateDepositUI(); calculateTotals();">
-                                <option value="none" {{ $oldDepositType == 'none' ? 'selected' : '' }}>Full Payment (No Deposit)</option>
-                                <option value="percentage" {{ $oldDepositType == 'percentage' ? 'selected' : '' }}>Percentage of Total</option>
-                                <option value="fixed" {{ $oldDepositType == 'fixed' ? 'selected' : '' }}>Fixed Flat Amount</option>
-                            </select>
-                        </div>
+<td>
+<input type="number"
+name="items[{{ $index }}][qty]"
+value="{{ $item['qty'] }}"
+class="premium-input item-qty"
+oninput="calculateRow(this)">
+</td>
 
-                        <div class="col-lg-4">
-                            <label class="form-label text-white fw-semibold" id="deposit_value_label">Value</label>
-                            <input type="number" step="0.01" min="0" name="deposit_value" id="deposit_value" class="form-control form-control-lg quote-input" value="{{ old('deposit_value', $quote->deposit_value ?? '') }}" placeholder="Enter value..." oninput="calculateTotals()">
-                            <small class="text-secondary mt-2 d-block" id="deposit_value_help"></small>
-                        </div>
+<td>
+<div class="money-wrap">
+<span>$</span>
+<input type="number"
+step="0.01"
+name="items[{{ $index }}][price]"
+value="{{ $item['price'] }}"
+class="premium-input item-price"
+oninput="calculateRow(this)">
+</div>
+</td>
 
-                        <div class="col-lg-4">
-                            <label class="form-label text-white fw-semibold">Balance Due Date</label>
-                            <input 
-                                type="date" 
-                                name="remaining_due_date" 
-                                id="remaining_due_date" 
-                                class="form-control form-control-lg quote-input quote-date-input" 
-                                value="{{ old('remaining_due_date', isset($quote->remaining_due_date) ? \Carbon\Carbon::parse($quote->remaining_due_date)->format('Y-m-d') : '') }}"
-                            >
-                        </div>
-                    </div>
+<td class="line-box item-total-display">$0.00</td>
 
-                    {{-- INTEGRATED CHECKBOX BLOCK --}}
-                    <div class="row g-3 mt-3">
-                        <div class="col-lg-4">
-                            <div class="form-check">
-                                <input type="checkbox" 
-                                       name="contract_required" 
-                                       class="form-check-input"
-                                       value="1"
-                                       {{ old('contract_required', $quote->contract_required ?? false) ? 'checked' : '' }}>
-                                <label class="form-check-label text-white">Contract Required</label>
-                            </div>
-                        </div>
+<input type="hidden"
+name="items[{{ $index }}][total]"
+value="{{ $item['total'] }}"
+class="item-total-hidden">
 
-                        <div class="col-lg-4">
-                            <div class="form-check">
-                                <input type="checkbox" 
-                                       name="signature_required" 
-                                       class="form-check-input"
-                                       value="1"
-                                       {{ old('signature_required', $quote->signature_required ?? false) ? 'checked' : '' }}>
-                                <label class="form-check-label text-white">Signature Required</label>
-                            </div>
-                        </div>
+<td>
+<button type="button" onclick="removeItemRow(this)" class="trash-btn">
+🗑
+</button>
+</td>
+</tr>
+@endforeach
+</tbody>
+</table>
+</div>
+</div>
 
-                        <div class="col-lg-4">
-                            <div class="form-check">
-                                <input type="checkbox" 
-                                       name="auto_convert_after_contract" 
-                                       class="form-check-input"
-                                       value="1"
-                                       {{ old('auto_convert_after_contract', $quote->auto_convert_after_contract ?? false) ? 'checked' : '' }}>
-                                <label class="form-check-label text-white">Auto Convert After Contract</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+{{-- STEP 3 --}}
+<div class="card-premium">
+<div class="step-title"><span>3</span> Payment Rules</div>
 
-                <hr class="my-5 border-secondary-subtle opacity-25">
+<div class="row g-3 align-items-end">
+<div class="col-md-3">
+<label>Deposit Amount</label>
+<input type="number"
+name="deposit_value"
+value="{{ old('deposit_value',$quote->deposit_value ?? 0) }}"
+class="form-control premium-input"
+oninput="calculateTotals()">
+</div>
 
-                {{-- BLOCK 4: ADDITIONAL NOTES --}}
-                <div class="mb-4">
-                    <h5 class="text-primary fw-bold mb-4 uppercase small letter-spacing-1">
-                        <i class="fa-solid fa-comment-dots me-2"></i> Client-Facing Notes
-                    </h5>
-                    <textarea name="customer_notes" id="customer_notes" rows="6" class="form-control quote-input" placeholder="Terms, conditions, or a thank you message for the client...">{{ old('customer_notes', $quote->customer_notes ?? '') }}</textarea>
-                    <p class="text-secondary small mt-2"><i class="fa-solid fa-circle-info me-1"></i> These notes appear on the PDF and the client portal.</p>
-                </div>
+<div class="col-md-3">
+<label>Deposit Type</label>
+<select name="deposit_type"
+class="form-control premium-input"
+onchange="calculateTotals()">
+<option value="none">No Deposit</option>
+<option value="percentage">Percentage %</option>
+<option value="fixed">Fixed Dollar $</option>
+</select>
+</div>
 
-                {{-- FORM ACTIONS --}}
-                <div class="d-flex justify-content-end gap-3 mt-5 pt-4 border-top border-secondary-subtle">
-                    <a href="{{ route('quotes.index') }}" class="btn btn-outline-light btn-lg px-5 rounded-pill small fw-bold">
-                        Discard
-                    </a>
-                    <button type="submit" class="btn btn-success btn-lg px-5 rounded-pill shadow-lg fw-bold">
-                        <i class="fa-solid fa-check-circle me-2"></i>
-                        {{ isset($quote) ? 'Save Changes' : 'Publish Quote' }}
-                    </button>
-                </div>
+<div class="col-md-6">
+<div class="hint-box" id="depositHint">
+Deposit will be calculated automatically.
+</div>
+</div>
+</div>
+</div>
 
-            </div>
-        </div>
-    </form>
+{{-- STEP 4 --}}
+<div class="card-premium">
+<div class="step-title"><span>4</span> Contract & Automation</div>
+
+<div class="row g-4">
+<div class="col-md-6">
+
+<div class="check-line">
+<input type="checkbox" name="contract_required" value="1"
+{{ old('contract_required', $quote->contract_required ?? false) ? 'checked' : '' }}>
+<label>Require Contract Signature</label>
+</div>
+
+<label class="mt-3">Legal Template</label>
+<select name="selected_contract_id" class="form-control premium-input">
+@for($i=1;$i<=4;$i++)
+@php $field="contract_{$i}_name"; @endphp
+@if(auth()->user()->company->$field)
+<option value="{{ $i }}"
+{{ old('selected_contract_id',$quote->selected_contract_id ?? '') == $i ? 'selected' : '' }}>
+{{ auth()->user()->company->$field }}
+</option>
+@endif
+@endfor
+</select>
+
+</div>
+
+<div class="col-md-6">
+
+<div class="mini-card">
+<h6>Automation Options</h6>
+
+<div class="check-line">
+<input type="checkbox" checked>
+<label>Require Signature Before Payment</label>
+</div>
+
+<div class="check-line">
+<input type="checkbox" checked>
+<label>Auto Convert to Invoice After Deposit</label>
+</div>
+
+</div>
+
+</div>
+</div>
+</div>
+
+{{-- STEP 5 --}}
+<div class="card-premium">
+<div class="step-title"><span>5</span> Client Notes</div>
+
+<textarea
+name="customer_notes"
+rows="5"
+class="form-control premium-input"
+placeholder="Visible to client...">{{ old('customer_notes',$quote->customer_notes ?? '') }}</textarea>
+
+<div class="small-note">These notes will be shown on the proposal and PDF.</div>
+</div>
+
+</div>
+
+{{-- RIGHT SIDEBAR --}}
+<div class="right-panel">
+
+<div class="summary-card">
+
+<div class="summary-icon">💳</div>
+<h4>Quote Summary</h4>
+
+<div class="sum-row">
+<span>Subtotal</span>
+<strong>$<span id="sub_total_display">0.00</span></strong>
+</div>
+
+<div class="sum-row gold">
+<span>Deposit Due</span>
+<strong>$<span id="dep_total_display">0.00</span></strong>
+</div>
+
+<div class="sum-row">
+<span>Balance Remaining</span>
+<strong>$<span id="bal_total_display">0.00</span></strong>
+</div>
+
+<hr>
+
+<div class="grand-row">
+<span>Grand Total</span>
+<strong>$<span id="grand_total_display">0.00</span></strong>
+</div>
+
+<button type="submit" class="publish-btn">
+🚀 Publish Quote
+</button>
+
+<p>This quote will be saved and ready to send.</p>
+
+</div>
+
+<div class="steps-card">
+<h5>What happens next?</h5>
+
+<div class="next-step">1. Publish Quote</div>
+<div class="next-step">2. Share with Client</div>
+<div class="next-step">3. Client Accepts</div>
+<div class="next-step">4. Auto Convert</div>
+
+</div>
+
+</div>
+
+</div>
+</form>
 </div>
 
 <style>
-.letter-spacing-1 { letter-spacing: 1px; }
-.quote-card, .payment-box, .totals-box { background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255,255,255,0.06); backdrop-filter: blur(12px); border-radius: 20px; }
-.quote-input { background: #020617 !important; border: 1px solid #1e293b !important; color: #fff !important; border-radius: 12px; transition: all 0.2s; }
-.quote-input:focus { background: #0f172a !important; border-color: #38bdf8 !important; box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.1) !important; }
-.quote-table { color: #fff; border-collapse: separate; border-spacing: 0 12px; }
-.quote-table thead th { border: none !important; color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; padding-left: 15px; }
-.quote-table tbody tr { background: #020617; transition: transform 0.2s; }
-.quote-table tbody tr:hover { transform: scale(1.005); }
-.quote-table td { padding: 14px 10px; border: none !important; vertical-align: middle; }
-.quote-table td:first-child { border-top-left-radius: 12px; border-bottom-left-radius: 12px; padding-left: 15px; }
-.quote-table td:last-child { border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
-
-/* Table Specific Input Styling */
-.quote-table input,
-.quote-table textarea {
-    background: #020617 !important;
-    border: 1px solid #1e293b !important;
-    color: #fff !important;
-    border-radius: 10px;
-    padding: 10px;
+.quote-shell{
+padding:30px;
+background:linear-gradient(135deg,#040b16,#07142a,#091c38);
+min-height:100vh;
+color:#fff;
 }
 
-.quote-table textarea {
-    resize: none;
+.topbar{
+display:flex;
+justify-content:space-between;
+align-items:flex-start;
+margin-bottom:28px;
+gap:20px;
 }
 
-.quote-table input:focus,
-.quote-table textarea:focus {
-    border-color: #38bdf8 !important;
-    background: #0f172a !important;
-    outline: none;
+.topbar h2{
+font-size:34px;
+font-weight:800;
+margin:0 0 6px;
 }
 
-.form-check-input { background-color: #020617; border-color: #1e293b; }
-.form-check-input:checked { background-color: #38bdf8; border-color: #38bdf8; }
-.btn-primary { background: #0ea5e9; border: none; }
-.btn-primary:hover { background: #0284c7; }
+.topbar p{
+margin:0 0 8px;
+color:#95a7c5;
+}
+
+.back-link{
+color:#fff;
+text-decoration:none;
+font-size:14px;
+}
+
+.preview-btn{
+background:transparent;
+border:1px solid #4a5f87;
+color:#fff;
+padding:10px 18px;
+border-radius:10px;
+}
+
+.builder-grid{
+display:grid;
+grid-template-columns:2.1fr .9fr;
+gap:26px;
+align-items:start;
+}
+
+.card-premium,.summary-card,.steps-card{
+background:rgba(11,26,52,.95);
+border:1px solid #1c3760;
+border-radius:18px;
+padding:24px;
+margin-bottom:22px;
+box-shadow:0 15px 35px rgba(0,0,0,.35);
+}
+
+.step-title{
+font-size:22px;
+font-weight:700;
+display:flex;
+align-items:center;
+gap:12px;
+margin-bottom:20px;
+}
+
+.step-title span{
+width:34px;
+height:34px;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#2374ff;
+border-radius:10px;
+font-size:16px;
+font-weight:800;
+}
+
+.step-head{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:18px;
+}
+
+.btn-blue{
+background:#2374ff;
+border:none;
+color:#fff;
+padding:12px 18px;
+border-radius:10px;
+font-weight:700;
+}
+
+label{
+font-size:13px;
+margin-bottom:7px;
+color:#9eb0cc;
+display:block;
+}
+
+.premium-input{
+width:100%;
+background:#071222;
+border:1px solid #28466f;
+color:#fff;
+padding:12px 14px;
+border-radius:10px;
+}
+
+.quote-table{
+width:100%;
+border-collapse:separate;
+border-spacing:0 10px;
+}
+
+.quote-table th{
+font-size:12px;
+color:#8da1c4;
+padding-bottom:8px;
+}
+
+.quote-table td{
+vertical-align:middle;
+}
+
+.money-wrap{
+display:flex;
+align-items:center;
+gap:6px;
+}
+
+.line-box{
+background:#09172a;
+border:1px solid #28466f;
+padding:12px;
+border-radius:10px;
+font-weight:700;
+}
+
+.trash-btn{
+background:#5f1020;
+border:none;
+color:#ff6f89;
+padding:10px 14px;
+border-radius:10px;
+}
+
+.hint-box,.mini-card{
+background:#132949;
+border:1px solid #28466f;
+padding:18px;
+border-radius:14px;
+color:#9ec3ff;
+}
+
+.check-line{
+display:flex;
+gap:10px;
+margin-bottom:14px;
+align-items:center;
+}
+
+.small-note{
+margin-top:10px;
+font-size:13px;
+color:#8fa0bc;
+}
+
+.summary-card h4{
+margin:0 0 18px;
+font-size:30px;
+font-weight:800;
+}
+
+.summary-icon{
+font-size:28px;
+margin-bottom:12px;
+}
+
+.sum-row,.grand-row{
+display:flex;
+justify-content:space-between;
+margin-bottom:16px;
+font-size:18px;
+}
+
+.gold{
+color:#ffd34f;
+font-weight:700;
+}
+
+.grand-row{
+font-size:34px;
+font-weight:900;
+color:#3e8cff;
+margin-top:18px;
+}
+
+.publish-btn{
+width:100%;
+margin-top:18px;
+background:#0fba62;
+border:none;
+padding:16px;
+border-radius:12px;
+font-size:22px;
+font-weight:800;
+color:#fff;
+}
+
+.summary-card p{
+margin-top:12px;
+text-align:center;
+font-size:13px;
+color:#9eb0cc;
+}
+
+.steps-card h5{
+font-size:24px;
+margin-bottom:18px;
+}
+
+.next-step{
+padding:12px 0;
+border-bottom:1px solid #1f3b66;
+color:#dce6ff;
+}
+
+@media(max-width:1200px){
+.builder-grid{
+grid-template-columns:1fr;
+}
+}
 </style>
 
 <script>
-    let itemIndex = {{ count($oldItems) }};
+let itemIdx={{ count($oldItems) }};
 
-    function addItemRow() {
-        const tbody = document.getElementById('quoteItemsBody');
-        const row = document.createElement('tr');
-        row.classList.add('item-row');
-        row.innerHTML = `
-            <td><input type="text" name="items[${itemIndex}][service]" class="form-control quote-input item-service" placeholder="Service name"></td>
-            <td><textarea name="items[${itemIndex}][description]" class="form-control quote-input item-description" rows="2" placeholder="Description"></textarea></td>
-            <td><input type="number" step="1" min="0" name="items[${itemIndex}][qty]" class="form-control quote-input item-qty" value="1" oninput="calculateRow(this)"></td>
-            <td>
-                <div class="input-group">
-                    <span class="input-group-text bg-transparent text-secondary border-end-0 small">$</span>
-                    <input type="number" step="0.01" min="0" name="items[${itemIndex}][price]" class="form-control quote-input item-price border-start-0" value="0" oninput="calculateRow(this)">
-                </div>
-            </td>
-            <td>
-                <div class="input-group">
-                    <span class="input-group-text bg-transparent text-secondary border-end-0 small">$</span>
-                    <input type="number" step="0.01" min="0" name="items[${itemIndex}][total]" class="form-control quote-input item-total border-start-0" value="0.00" readonly>
-                </div>
-            </td>
-            <td class="text-center"><button type="button" class="btn btn-link text-danger p-0" onclick="removeItemRow(this)"><i class="fa-solid fa-circle-xmark fs-4"></i></button></td>
-        `;
-        tbody.appendChild(row);
-        itemIndex++;
-    }
+function addItemRow(){
+const tbody=document.getElementById('quoteItemsBody');
 
-    function removeItemRow(button) {
-        const rows = document.querySelectorAll('#quoteItemsBody .item-row');
-        if (rows.length > 1) {
-            button.closest('tr').remove();
-            calculateTotals();
-        }
-    }
+const row=document.createElement('tr');
+row.classList.add('item-row');
 
-    function calculateRow(input) {
-        const row = input.closest('tr');
-        const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
-        const price = parseFloat(row.querySelector('.item-price').value) || 0;
-        row.querySelector('.item-total').value = (qty * price).toFixed(2);
-        calculateTotals();
-    }
+row.innerHTML=`
+<td><input type="text" name="items[${itemIdx}][service]" class="premium-input" required></td>
+<td><input type="text" name="items[${itemIdx}][description]" class="premium-input"></td>
+<td><input type="number" name="items[${itemIdx}][qty]" class="premium-input item-qty" value="1" oninput="calculateRow(this)"></td>
+<td><div class="money-wrap"><span>$</span><input type="number" step="0.01" name="items[${itemIdx}][price]" class="premium-input item-price" value="0" oninput="calculateRow(this)"></div></td>
+<td class="line-box item-total-display">$0.00</td>
+<input type="hidden" name="items[${itemIdx}][total]" class="item-total-hidden" value="0">
+<td><button type="button" onclick="removeItemRow(this)" class="trash-btn">🗑</button></td>
+`;
 
-    function updateDepositUI() {
-        const type = document.getElementById('deposit_type').value;
-        const label = document.getElementById('deposit_value_label');
-        const input = document.getElementById('deposit_value');
-        const help = document.getElementById('deposit_value_help');
+tbody.appendChild(row);
+itemIdx++;
+}
 
-        if (type === 'percentage') { 
-            label.textContent = 'Deposit Percentage (%)'; 
-            input.placeholder = 'e.g. 25';
-            help.textContent = 'Client will pay this % upfront.';
-            input.disabled = false;
-        } else if (type === 'fixed') { 
-            label.textContent = 'Deposit Amount ($)'; 
-            input.placeholder = 'e.g. 500';
-            help.textContent = 'Client will pay this fixed amount upfront.';
-            input.disabled = false;
-        } else { 
-            label.textContent = 'No Deposit Required'; 
-            input.placeholder = '0.00';
-            help.textContent = 'Client pays full amount after approval.';
-            input.disabled = true;
-            input.value = '';
-        }
-    }
+function removeItemRow(btn){
+if(document.querySelectorAll('.item-row').length>1){
+btn.closest('tr').remove();
+calculateTotals();
+}
+}
 
-    function calculateTotals() {
-        let subtotal = 0;
-        document.querySelectorAll('.item-total').forEach(input => { subtotal += parseFloat(input.value) || 0; });
+function calculateRow(input){
+const row=input.closest('tr');
 
-        const depType = document.getElementById('deposit_type').value;
-        const depVal = parseFloat(document.getElementById('deposit_value').value) || 0;
-        let depAmt = 0;
+const qty=parseFloat(row.querySelector('.item-qty').value)||0;
+const price=parseFloat(row.querySelector('.item-price').value)||0;
+const total=qty*price;
 
-        if (depType === 'percentage') { depAmt = subtotal * (depVal / 100); }
-        else if (depType === 'fixed') { depAmt = depVal; }
+row.querySelector('.item-total-display').innerHTML='$'+total.toLocaleString(undefined,{minimumFractionDigits:2});
+row.querySelector('.item-total-hidden').value=total.toFixed(2);
 
-        if (depAmt > subtotal) depAmt = subtotal;
+calculateTotals();
+}
 
-        document.getElementById('subtotal_display').textContent = subtotal.toLocaleString(undefined, {minimumFractionDigits: 2});
-        document.getElementById('deposit_display').textContent = depAmt.toLocaleString(undefined, {minimumFractionDigits: 2});
-        document.getElementById('remaining_display').textContent = (subtotal - depAmt).toLocaleString(undefined, {minimumFractionDigits: 2});
-        document.getElementById('total_display').textContent = subtotal.toLocaleString(undefined, {minimumFractionDigits: 2});
+function calculateTotals(){
+let subtotal=0;
 
-        document.getElementById('subtotal').value = subtotal.toFixed(2);
-        document.getElementById('total').value = subtotal.toFixed(2);
-    }
+document.querySelectorAll('.item-total-hidden').forEach(el=>{
+subtotal += parseFloat(el.value)||0;
+});
 
-    document.addEventListener('DOMContentLoaded', () => {
-        updateDepositUI();
-        document.querySelectorAll('.item-row').forEach(row => calculateRow(row.querySelector('.item-qty')));
-    });
+const depType=document.querySelector('[name="deposit_type"]').value;
+const depVal=parseFloat(document.querySelector('[name="deposit_value"]').value)||0;
+
+let depTotal=0;
+
+if(depType==='percentage'){
+depTotal=subtotal*(depVal/100);
+}else if(depType==='fixed'){
+depTotal=depVal;
+}
+
+const bal=subtotal-depTotal;
+
+document.getElementById('sub_total_display').innerHTML=subtotal.toLocaleString(undefined,{minimumFractionDigits:2});
+document.getElementById('dep_total_display').innerHTML=depTotal.toLocaleString(undefined,{minimumFractionDigits:2});
+document.getElementById('bal_total_display').innerHTML=bal.toLocaleString(undefined,{minimumFractionDigits:2});
+document.getElementById('grand_total_display').innerHTML=subtotal.toLocaleString(undefined,{minimumFractionDigits:2});
+
+document.getElementById('depositHint').innerHTML=
+depType==='percentage'
+? depVal+'% of $'+subtotal.toFixed(2)+' = $'+depTotal.toFixed(2)
+: 'Deposit will be calculated automatically.';
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+document.querySelectorAll('.item-row').forEach(row=>{
+calculateRow(row.querySelector('.item-qty'));
+});
+});
 </script>
+
 @endsection

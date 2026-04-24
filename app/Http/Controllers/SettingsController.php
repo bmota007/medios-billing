@@ -5,36 +5,42 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Company;
+use Illuminate\Support\Facades\Storage;
 
 class SettingsController extends Controller
 {
     public function index()
     {
-        // Fetch the current user's company
         $company = Company::find(auth()->user()->company_id);
         return view('settings.index', compact('company'));
     }
 
     public function update(Request $request)
     {
-        // Validate that keys are provided
-        $request->validate([
-            'client_stripe_key' => 'required|string',
-            'client_stripe_secret' => 'required|string',
-        ]);
-
-        // Find the specific company for the logged-in user
         $company = Company::find(auth()->user()->company_id);
 
-        if ($company) {
-            $company->update([
-                'client_stripe_key' => $request->client_stripe_key,
-                'client_stripe_secret' => $request->client_stripe_secret,
-            ]);
+        // 1. Stripe Keys
+        $company->client_stripe_key = $request->client_stripe_key;
+        $company->client_stripe_secret = $request->client_stripe_secret;
 
-            return back()->with('success', 'Stripe Configuration Saved Successfully!');
+        // 2. Loop through 4 Contract slots
+        for ($i = 1; $i <= 4; $i++) {
+            $nameField = "contract_{$i}_name";
+            $fileField = "contract_{$i}_file";
+            $pathField = "contract_{$i}_path";
+
+            if ($request->has($nameField)) {
+                $company->$nameField = $request->$nameField;
+            }
+
+            if ($request->hasFile($fileField)) {
+                // Remove old template if replacing
+                if ($company->$pathField) { Storage::delete($company->$pathField); }
+                $company->$pathField = $request->file($fileField)->store('contracts', 'public');
+            }
         }
 
-        return back()->with('error', 'Company not found.');
+        $company->save();
+        return back()->with('success', 'Platform Intelligence & Contracts Updated!');
     }
 }
