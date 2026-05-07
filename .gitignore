@@ -35,3 +35,16 @@ yarn-error.log*.log
 Homestead.json
 Homestead.yaml
 Thumbs.db
+# Backup / temp files
+*.bak
+*.BROKEN
+*.backup
+*.old
+*.tmp
+*.sed
+
+# Local backup folders
+backups/
+
+# OS files
+.DS_Store
