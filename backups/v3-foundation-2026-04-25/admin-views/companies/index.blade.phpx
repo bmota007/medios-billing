@@ -1,0 +1,109 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="container-fluid px-5 py-5" style="background: #0b0e14; min-height: 100vh;">
+    <div class="row mb-5 align-items-center">
+        <div class="col-md-8">
+            <h6 class="text-primary text-uppercase fw-bold tracking-widest mb-2" style="letter-spacing: 3px; font-size: 0.7rem;">Infrastructure Oversight</h6>
+            <h1 class="display-5 text-white fw-bold mb-0">Managed Entities</h1>
+        </div>
+        <div class="col-md-4 text-md-end mt-4 mt-md-0">
+            <a href="{{ route('admin.companies.create') }}" class="btn btn-primary px-4 py-3 rounded-3 fw-bold shadow-glow border-0 transition-transform">
+                <i class="fas fa-plus-circle me-2"></i> PROVISION NEW NODE
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        @foreach($companies as $company)
+        <div class="col-xl-4 col-md-6">
+            <div class="saas-card h-100 position-relative overflow-hidden p-4 rounded-4 border border-white border-opacity-10 shadow-lg">
+                <div class="position-relative z-index-10">
+                    <div class="d-flex justify-content-between align-items-start mb-4">
+                        <div class="entity-avatar d-flex align-items-center justify-content-center shadow-lg">
+                            {{ substr($company->name, 0, 1) }}
+                        </div>
+                        <div class="text-end">
+                            <span class="status-pill active mb-1">ONLINE</span>
+                            <div class="text-muted small fw-mono">ID: {{ str_pad($company->id, 4, '0', STR_PAD_LEFT) }}</div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-white fw-bold mb-1 h4">{{ $company->name }}</h3>
+                    <p class="text-secondary small mb-4 opacity-75"><i class="fa-regular fa-envelope me-2"></i>{{ $company->email }}</p>
+
+                    <div class="stats-container d-flex gap-3 mb-4 p-3 rounded-3" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05);">
+                        <div class="text-center flex-fill">
+                            <div class="text-primary fw-bold fs-5">{{ $company->users_count }}</div>
+                            <div class="text-muted opacity-50" style="font-size: 0.6rem; letter-spacing: 1px;">TOTAL USERS</div>
+                        </div>
+                        <div class="text-center flex-fill border-start border-white border-opacity-10">
+                            <div class="text-success fw-bold fs-5">100%</div>
+                            <div class="text-muted opacity-50" style="font-size: 0.6rem; letter-spacing: 1px;">SYSTEM UPTIME</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <a href="{{ route('admin.impersonate', $company->id) }}" class="btn btn-access flex-grow-1 py-3 fw-bold transition-all">
+                            <i class="fa-solid fa-bolt-lightning me-2"></i>ACCESS CORE
+                        </a>
+                        <div class="dropdown">
+                            <button class="btn btn-manage py-3 px-3" type="button" data-bs-toggle="dropdown">
+                                <i class="fa-solid fa-ellipsis-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow-xl border-white border-opacity-10">
+                                <li><a class="dropdown-item py-2" href="#"><i class="fa-solid fa-sliders me-2 text-primary"></i> Configure Node</a></li>
+                                <li><a class="dropdown-item py-2" href="#"><i class="fa-solid fa-chart-line me-2 text-info"></i> View Metrics</a></li>
+                                <li><hr class="dropdown-divider opacity-10"></li>
+                                <li><a class="dropdown-item py-2 text-danger" href="#"><i class="fa-solid fa-power-off me-2"></i> Decommission</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endforeach
+    </div>
+</div>
+
+<style>
+    /* Premium SaaS Typography & Effects */
+    .saas-card {
+        background: #161b22;
+        transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    }
+    .saas-card:hover {
+        transform: translateY(-8px);
+        background: #1c2128;
+        border-color: #38bdf8 !important;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.6) !important;
+    }
+    .entity-avatar {
+        width: 55px; height: 55px;
+        background: linear-gradient(135deg, #38bdf8, #1d4ed8);
+        color: white; font-weight: 800; font-size: 1.4rem;
+        border-radius: 14px;
+    }
+    .shadow-glow { box-shadow: 0 0 25px rgba(56, 189, 248, 0.3); }
+    .status-pill {
+        font-size: 0.6rem; font-weight: 800;
+        padding: 3px 10px; border-radius: 20px;
+        background: rgba(16, 185, 129, 0.1); color: #10b981;
+    }
+    .btn-access {
+        background: rgba(56, 189, 248, 0.08);
+        color: #38bdf8;
+        border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .btn-access:hover {
+        background: #38bdf8;
+        color: #000;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    }
+    .btn-manage {
+        background: rgba(255,255,255,0.05);
+        color: #fff; border: 1px solid rgba(255,255,255,0.1);
+    }
+    .transition-transform:hover { transform: scale(1.02); }
+</style>
+@endsection

@@ -34,7 +34,7 @@
 
 <div class="container">
     <div class="logo-container">
-        <img src="{{ $companyLogo }}" alt="{{ $companyName }}" style="max-width: 180px; height: auto;">
+        <img src="{{ asset('storage/'.$company->logo) }}" width="180">
     </div>
 
     <h2>Hello {{ $invoice->customer_name }},</h2>

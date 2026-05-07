@@ -76,12 +76,12 @@ class MediosRegisterController extends Controller
                 'mode' => 'subscription',
                 'subscription_data' => ['trial_period_days' => 7],
                 'customer_email' => $user->email,
-                'success_url' => route('dashboard') . '?session_id={CHECKOUT_SESSION_ID}',
+                'success_url' => url('/billing/success') . '?session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => route('register'),
             ]);
             return redirect($checkoutSession->url);
         } catch (\Exception $e) {
-            return redirect()->route('dashboard');
+            return redirect()->url('/billing/success');
         }
     }
 
@@ -97,6 +97,6 @@ class MediosRegisterController extends Controller
         $user->update(['password' => Hash::make($request->password), 'email_verified_at' => now()]);
         $company->update(['setup_token' => null, 'subscription_status' => 'trialing', 'is_active' => true]);
         Auth::login($user);
-        return redirect()->route('dashboard');
+        return redirect()->url('/billing/success');
     }
 }

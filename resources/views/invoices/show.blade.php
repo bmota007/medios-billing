@@ -1,130 +1,853 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('content')
+@php
+$isPublicView = request()->routeIs('invoice.public_view');
+@endphp
 
-<div class="card">
+@php
+$items = json_decode($invoice->items, true) ?? [];
 
-<div style="display:flex;justify-content:space-between;margin-bottom:25px;">
+$subtotal = $invoice->subtotal ?? $invoice->total ?? 0;
+$tax = $invoice->tax_amount ?? 0;
+$total = $invoice->total ?? 0;
 
-<div>
-<h1 style="margin:0;">Invoice</h1>
-<p>#{{ $invoice->invoice_no }}</p>
-</div>
+$deposit = $invoice->deposit_amount;
 
-<div style="text-align:right;">
-<p style="margin:0;font-weight:bold;">{{ auth()->user()->company->name ?? '' }}</p>
-<p style="margin:0;">{{ auth()->user()->company->email ?? '' }}</p>
-<p style="margin:0;">{{ auth()->user()->company->phone ?? '' }}</p>
-</div>
+if(!$deposit || $deposit <= 0){
+    $deposit = $total * 0.35;
+}
 
-</div>
+$remaining = $invoice->remaining_balance;
 
-<hr>
+if(!$remaining || $remaining <= 0){
+    $remaining = $total - $deposit;
+}
+@endphp
 
-<div style="display:flex;justify-content:space-between;margin-top:20px;margin-bottom:20px;">
+<div class="invoice-shell">
 
-<div>
+    <div class="topbar">
+@if(!$isPublicView)
 
-<strong>Bill To</strong>
+        <div class="left-actions">
+            <a href="{{ url('/invoices') }}" class="top-btn">
+                ← Back
+            </a>
+        </div>
 
-<p>{{ $invoice->customer_name }}</p>
-<p>{{ $invoice->customer_email }}</p>
+<div class="right-actions">
 
-@if($invoice->street_address)
-<p>{{ $invoice->street_address }}</p>
-@endif
+    <a href="{{ route('invoice.edit',$invoice->id) }}"
+       class="action-btn dark">
+        ✏ Edit Invoice
+    </a>
 
-@if($invoice->city_state_zip)
-<p>{{ $invoice->city_state_zip }}</p>
-@endif
+@if($invoice->status === 'sent')
 
-</div>
+<form action="{{ route('invoice.resend',$invoice->id) }}"
+      method="POST"
+      style="display:inline;">
+    @csrf
 
-<div style="text-align:right;">
+    <button type="submit"
+            class="action-btn resend-btn">
+        ↻ Resend
+    </button>
+</form>
 
-<p><strong>Date:</strong> {{ $invoice->invoice_date }}</p>
-<p><strong>Due:</strong> {{ $invoice->due_date }}</p>
-
-@if($invoice->status == 'paid')
-<p style="color:green;font-weight:bold;">PAID</p>
 @else
-<p style="color:red;font-weight:bold;">UNPAID</p>
+
+<form action="{{ route('invoice.send.existing') }}"
+      method="POST"
+      style="display:inline;">
+    @csrf
+
+    <input type="hidden"
+           name="invoice_id"
+           value="{{ $invoice->id }}">
+
+    <button type="submit"
+            class="action-btn send-btn">
+        ✓ Send
+    </button>
+</form>
+
+@endif
+
+    <a href="{{ route('invoice.pdf',$invoice->id) }}"
+       class="action-btn blue">
+        Download PDF
+    </a>
+
+    <a href="#"
+       onclick="window.print(); return false;"
+       class="action-btn dark">
+        Print
+    </a>
+
+    <a href="{{ url('/invoice/pay/'.$invoice->invoice_no) }}"
+       class="action-btn green">
+        Pay Now
+    </a>
+
+</div>
+
+</div>
+@endif
+<div class="invoice-card">
+
+        <div class="invoice-header">
+
+            <div>
+
+                <div class="mini-title">
+                    PROFESSIONAL INVOICE
+                </div>
+
+                <h1>
+                    Invoice #{{ $invoice->invoice_no }}
+                </h1>
+
+                <span class="status {{ $invoice->status }}">
+                    {{ strtoupper($invoice->status) }}
+                </span>
+
+            </div>
+
+            <div class="company-info">
+
+                <h2>
+                    {{ auth()->user()->company->name ?? 'Company' }}
+                </h2>
+
+                <p>
+                    {{ auth()->user()->company->email ?? '' }}
+                </p>
+
+                <p>
+                    {{ auth()->user()->company->phone ?? '' }}
+                </p>
+
+            </div>
+
+        </div>
+
+        <div class="grid-top">
+
+            <div class="card-block">
+
+                <small>BILLED TO</small>
+
+                <h3>
+                    {{ $invoice->customer_name
+                        ?? $invoice->customer->name
+                        ?? 'Customer' }}
+                </h3>
+
+                <p>
+                    {{ $invoice->customer_email
+                        ?? $invoice->customer->email
+                        ?? '' }}
+                </p>
+
+            </div>
+
+            <div class="card-block amount-due">
+
+                <small>AMOUNT DUE</small>
+
+                <div class="amount">
+                    ${{ number_format($total,2) }}
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="grid-dates">
+
+            <div class="date-card">
+                <small>INVOICE DATE</small>
+
+                <h4>
+                    {{ \Carbon\Carbon::parse($invoice->invoice_date)->format('M d, Y') }}
+                </h4>
+            </div>
+
+            @if($invoice->deposit_due_date)
+            <div class="date-card">
+                <small>DEPOSIT DUE</small>
+
+                <h4>
+                    {{ \Carbon\Carbon::parse($invoice->deposit_due_date)->format('M d, Y') }}
+                </h4>
+            </div>
+            @endif
+
+            @if($invoice->remaining_due_date)
+            <div class="date-card">
+                <small>REMAINING DUE</small>
+
+                <h4>
+                    {{ \Carbon\Carbon::parse($invoice->remaining_due_date)->format('M d, Y') }}
+                </h4>
+            </div>
+            @else
+            <div class="date-card">
+                <small>DUE DATE</small>
+
+                <h4>
+                    {{ \Carbon\Carbon::parse($invoice->due_date)->format('M d, Y') }}
+                </h4>
+            </div>
+            @endif
+
+        </div>
+
+        <div class="content-grid">
+
+            {{-- LEFT COLUMN --}}
+            <div class="left-column">
+
+                <div class="panel">
+
+                    <h2>Services & Items</h2>
+
+                    <table class="invoice-table">
+
+                        <thead>
+                            <tr>
+                                <th>Description</th>
+                                <th>Qty</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                        @foreach($items as $item)
+
+                            <tr>
+
+                                <td>{{ $item['desc'] ?? '' }}</td>
+
+                                <td>{{ $item['qty'] ?? 0 }}</td>
+
+                                <td>
+                                    ${{ number_format($item['price'] ?? 0,2) }}
+                                </td>
+
+                                <td>
+                                    ${{ number_format($item['line_total'] ?? 0,2) }}
+                                </td>
+
+                            </tr>
+
+                        @endforeach
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+@if(!$isPublicView)
+
+                <div class="panel sms-panel">
+
+                    <h2>Client Messaging</h2>
+
+                    <p class="sms-text">
+                        Use this section to quickly text the invoice link
+                        to the client using your Telnyx setup.
+                    </p>
+
+                    <label>Customer Phone</label>
+
+                    <input type="text"
+                           value="{{ $invoice->customer_phone ?? '' }}"
+                           class="sms-input">
+
+                    <label>SMS Preview</label>
+
+                    <textarea class="sms-preview">Hi {{ $invoice->customer_name ?? 'Customer' }}, your invoice #{{ $invoice->invoice_no }} is ready:
+
+{{ url('/invoice/view/'.$invoice->invoice_no) }}</textarea>
+
+                    <button class="sms-btn">
+                        ✈ Send SMS
+                    </button>
+
+                    <p class="sms-footer">
+                        This gives the owner a fast way to send the invoice
+                        by text from inside the invoice page.
+                    </p>
+
+</div>
+
+<div class="panel test-email-panel">
+
+    <h2>Send Test Email</h2>
+
+    <input type="email"
+           class="test-email-input"
+           placeholder="you@example.com">
+
+    <button class="test-email-btn">
+        Send Test
+    </button>
+
+</div>
+
 @endif
 
 </div>
 
+{{-- RIGHT COLUMN --}}
+
+
+            <div class="right-column">
+
+                <div class="panel payment-panel">
+
+                    <h2>Payment Flow</h2>
+
+                    <a href="{{ url('/invoice/pay/'.$invoice->invoice_no) }}"
+                       class="pay-btn">
+                        💳 Pay Full Invoice Now
+                    </a>
+
+                    <div class="summary-row">
+                        <span>Subtotal</span>
+                        <strong>${{ number_format($subtotal,2) }}</strong>
+                    </div>
+
+                    <div class="summary-row">
+                        <span>Tax</span>
+                        <strong>${{ number_format($tax,2) }}</strong>
+                    </div>
+
+                    <div class="summary-total">
+                        <span>Total</span>
+                        <strong>${{ number_format($total,2) }}</strong>
+                    </div>
+
+                    <div class="payment-boxes">
+
+                        <div class="pay-box">
+
+                            <small>DEPOSIT REQUIRED</small>
+
+                            <h3>
+                                ${{ number_format($deposit,2) }}
+                            </h3>
+
+                        </div>
+
+                        <div class="pay-box">
+
+                            <small>REMAINING BALANCE</small>
+
+                            <h3>
+                                ${{ number_format($remaining,2) }}
+                            </h3>
+
+                        </div>
+
+                    </div>
+@if(!$isPublicView)
+                    <div class="payment-options">
+
+                        <label class="radio-option">
+                            <input type="radio" checked>
+                            <span>Customer will pay themselves</span>
+                        </label>
+
+                        <label class="radio-option">
+                            <input type="radio">
+                            <span>I am charging customer manually</span>
+                        </label>
+
+                    </div>
+
+                    <div class="manual-text">
+
+                        <strong>Manual Charge Mode</strong>
+
+                        <p>
+                            Use these buttons if you are collecting payment
+                            directly by phone, in person, or assisting the customer.
+                        </p>
+
+                    </div>
+
+                    <div class="manual-buttons">
+
+                        <button class="manual-btn blue-btn">
+                            💳 Pay Now
+                        </button>
+
+                        <button class="manual-btn gold-btn">
+                            💳 Pay Deposit
+                        </button>
+
+                    </div>
+@endif
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
 </div>
 
-<table>
+<style>
 
-<thead>
+.invoice-shell{
+padding:30px;
+color:#fff;
+background:
+radial-gradient(circle at top left,#122041,#050816);
+min-height:100vh;
+}
 
-<tr>
+.topbar{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:20px;
+gap:15px;
+flex-wrap:wrap;
+}
 
-<th>Service</th>
-<th>Qty</th>
-<th>Price</th>
-<th>Total</th>
+.right-actions{
+display:flex;
+gap:12px;
+flex-wrap:wrap;
+}
 
-</tr>
+.top-btn,
+.action-btn{
+padding:12px 18px;
+border-radius:12px;
+text-decoration:none;
+color:#fff;
+font-weight:700;
+}
 
-</thead>
+.action-btn.blue{
+background:#2563eb;
+}
 
-<tbody>
+.action-btn.green{
+background:#10b981;
+}
 
-@foreach($invoice->items ?? [] as $item)
+.action-btn.dark{
+background:#1e293b;
+}
 
-<tr>
+.invoice-card{
+max-width:1200px;
+margin:auto;
+background:#050b1d;
+border:1px solid #172554;
+border-radius:30px;
+padding:40px;
+box-shadow:0 30px 80px rgba(0,0,0,.45);
+}
 
+.invoice-header{
+display:flex;
+justify-content:space-between;
+gap:30px;
+margin-bottom:35px;
+flex-wrap:wrap;
+}
 
-<td>{{ $item['desc'] ?? '' }}</td>
+.mini-title{
+font-size:12px;
+letter-spacing:2px;
+color:#38bdf8;
+margin-bottom:10px;
+}
 
-<td>{{ number_format($item['qty'] ?? 0,2) }}</td>
+.invoice-header h1{
+font-size:58px;
+margin:0;
+line-height:1.1;
+}
 
-<td>${{ number_format($item['price'] ?? 0,2) }}</td>
-<td>${{ number_format($item['line_total'] ?? 0,2) }}</td>
-</tr>
+.status{
+display:inline-block;
+margin-top:18px;
+padding:10px 16px;
+border-radius:999px;
+background:#1d4ed8;
+font-size:12px;
+font-weight:700;
+}
 
-@endforeach
+.company-info{
+text-align:right;
+}
 
-</tbody>
+.company-info h2{
+margin:0;
+font-size:48px;
+line-height:1.1;
+}
 
-</table>
+.company-info p{
+margin-top:8px;
+color:#e2e8f0;
+}
 
-<div style="margin-top:25px;display:flex;justify-content:flex-end;">
+.grid-top{
+display:grid;
+grid-template-columns:2fr 1fr;
+gap:22px;
+margin-bottom:22px;
+}
 
-<div style="width:250px;">
+.card-block{
+background:#111b34;
+padding:35px;
+border-radius:24px;
+}
 
-<div style="display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding-bottom:6px;">
-<span>Subtotal</span>
-<span>${{ number_format($invoice->total,2) }}</span>
-</div>
+.card-block small{
+display:block;
+margin-bottom:12px;
+color:#cbd5e1;
+font-size:12px;
+letter-spacing:1px;
+}
 
-<div style="display:flex;justify-content:space-between;font-weight:bold;padding-top:8px;">
-<span>Total</span>
-<span>${{ number_format($invoice->total,2) }}</span>
-</div>
+.card-block h3{
+font-size:34px;
+margin:0;
+}
 
-</div>
+.card-block p{
+margin-top:10px;
+color:#dbeafe;
+}
 
-</div>
+.amount-due .amount{
+font-size:60px;
+font-weight:800;
+color:#38bdf8;
+margin-top:18px;
+}
 
-<div style="margin-top:30px;display:flex;gap:10px;">
+.grid-dates{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:22px;
+margin-bottom:25px;
+}
 
-<a href="{{ route('invoice.pdf',$invoice->id) }}" class="btn btn-blue">
-Download PDF
-</a>
+.date-card{
+background:#111b34;
+padding:28px;
+border-radius:22px;
+}
 
-<button class="btn btn-green">
-Send Invoice
-</button>
+.date-card small{
+display:block;
+margin-bottom:10px;
+color:#cbd5e1;
+}
 
-<button class="btn btn-purple">
-Pay Now
-</button>
+.date-card h4{
+margin:0;
+font-size:28px;
+}
 
-</div>
+.content-grid{
+display:grid;
+grid-template-columns:2fr 1fr;
+gap:25px;
+align-items:start;
+}
 
-</div>
+.left-column,
+.right-column{
+display:flex;
+flex-direction:column;
+gap:25px;
+}
+
+.panel{
+background:#091224;
+padding:30px;
+border-radius:25px;
+}
+
+.panel h2{
+margin-top:0;
+margin-bottom:25px;
+font-size:32px;
+}
+
+.invoice-table{
+width:100%;
+border-collapse:collapse;
+}
+
+.invoice-table th{
+text-align:left;
+padding-bottom:18px;
+color:#94a3b8;
+font-size:13px;
+}
+
+.invoice-table td{
+padding:18px 0;
+border-top:1px solid rgba(255,255,255,.06);
+font-size:16px;
+}
+
+.summary-row,
+.summary-total{
+display:flex;
+justify-content:space-between;
+margin-top:18px;
+}
+
+.summary-row{
+font-size:15px;
+}
+
+.summary-total{
+font-size:42px;
+font-weight:800;
+margin-top:28px;
+align-items:center;
+}
+
+.payment-boxes{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:18px;
+margin-top:28px;
+}
+
+.pay-box{
+background:#13203d;
+padding:24px;
+border-radius:18px;
+}
+
+.pay-box small{
+display:block;
+margin-bottom:12px;
+color:#cbd5e1;
+font-size:12px;
+}
+
+.pay-box h3{
+margin:0;
+font-size:36px;
+}
+
+.pay-btn{
+display:block;
+margin-bottom:28px;
+background:linear-gradient(135deg,#2563eb,#60a5fa);
+padding:20px;
+text-align:center;
+border-radius:18px;
+font-weight:800;
+text-decoration:none;
+color:#fff;
+font-size:18px;
+}
+
+.sms-text{
+color:#94a3b8;
+font-size:14px;
+line-height:1.7;
+margin-bottom:20px;
+}
+
+.sms-panel label{
+display:block;
+margin-top:18px;
+margin-bottom:8px;
+font-size:13px;
+font-weight:700;
+color:#cbd5e1;
+}
+
+.sms-input,
+.sms-preview{
+width:100%;
+background:#0b1730;
+border:1px solid rgba(255,255,255,.08);
+border-radius:14px;
+padding:14px;
+color:#fff;
+font-size:14px;
+}
+
+.sms-preview{
+min-height:120px;
+resize:none;
+}
+
+.sms-btn{
+width:100%;
+margin-top:20px;
+border:none;
+padding:16px;
+border-radius:16px;
+background:linear-gradient(135deg,#14b8a6,#34d399);
+color:#fff;
+font-weight:800;
+font-size:16px;
+cursor:pointer;
+}
+
+.sms-footer{
+margin-top:12px;
+font-size:12px;
+color:#94a3b8;
+}
+
+.payment-options{
+margin-top:22px;
+display:flex;
+flex-direction:column;
+gap:12px;
+}
+
+.radio-option{
+display:flex;
+align-items:center;
+gap:10px;
+font-size:14px;
+color:#dbeafe;
+}
+
+.radio-option input{
+accent-color:#2563eb;
+}
+
+.manual-text{
+margin-top:22px;
+}
+
+.manual-text strong{
+display:block;
+margin-bottom:8px;
+color:#cbd5e1;
+font-size:18px;
+}
+
+.manual-text p{
+font-size:13px;
+line-height:1.7;
+color:#64748b;
+}
+
+.manual-buttons{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:14px;
+margin-top:22px;
+}
+
+.manual-btn{
+border:none;
+padding:16px;
+border-radius:16px;
+font-weight:800;
+font-size:15px;
+color:#fff;
+cursor:pointer;
+}
+
+.test-email-panel{
+margin-top:25px;
+}
+
+.test-email-input{
+width:100%;
+background:#020617;
+border:1px solid rgba(255,255,255,.08);
+border-radius:18px;
+padding:22px;
+color:#fff;
+font-size:18px;
+margin-top:20px;
+}
+
+.test-email-btn{
+width:100%;
+margin-top:25px;
+border:none;
+padding:22px;
+border-radius:22px;
+background:linear-gradient(135deg,#4f46e5,#818cf8);
+color:#fff;
+font-size:20px;
+font-weight:800;
+cursor:pointer;
+}
+
+.blue-btn{
+background:linear-gradient(135deg,#1d4ed8,#60a5fa);
+}
+
+.gold-btn{
+background:linear-gradient(135deg,#a16207,#f59e0b);
+}
+
+.send-btn{
+background:linear-gradient(135deg,#2563eb,#3b82f6);
+}
+
+.resend-btn{
+background:linear-gradient(135deg,#0f766e,#14b8a6);
+}
+
+@media(max-width:1100px){
+
+.content-grid{
+grid-template-columns:1fr;
+}
+
+.grid-top{
+grid-template-columns:1fr;
+}
+
+.grid-dates{
+grid-template-columns:1fr;
+}
+
+.invoice-header{
+flex-direction:column;
+}
+
+.company-info{
+text-align:left;
+}
+
+.invoice-header h1{
+font-size:42px;
+}
+
+.company-info h2{
+font-size:38px;
+}
+
+}
+
+</style>
 
 @endsection

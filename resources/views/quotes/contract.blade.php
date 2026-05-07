@@ -1,137 +1,152 @@
-@extends('layouts.app')
+@extends('layouts.blank')
 
 @section('content')
-<div class="container py-5">
-    <div class="card shadow-lg border-0" style="max-width: 950px; margin: auto; background: #fff; color: #333; border-radius: 20px; overflow: hidden;">
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
 
-        {{-- Header --}}
-        <div class="p-5 text-center" style="background: #0f172a; color: #fff;">
-            <h2 class="fw-bold mb-1">{{ strtoupper($quote->company->name) }}</h2>
-            <p class="mb-0 opacity-75">{{ $quote->company->address }}</p>
-            <p class="mb-0 opacity-75">Document #{{ $quote->quote_number }}</p>
-            <h3 class="mt-3 fw-light">
-                {{ $selectedContractName ?: 'GENERAL SERVICES AGREEMENT' }}
-            </h3>
+@php
+    $items = json_decode($quote->items ?? '[]', true);
+    $subtotal = abs($quote->subtotal ?? $quote->total ?? 0);
+    $taxPercent = $quote->tax_percent ?? 0;
+    $taxAmount = $subtotal * ($taxPercent / 100);
+    $total = $subtotal + $taxAmount;
+    $fmtDate = fn($d) => $d ? (is_string($d) ? date('M d, Y', strtotime($d)) : $d->format('M d, Y')) : 'N/A';
+@endphp
+
+<style>
+    body { background: #f1f5f9; color: #1e293b; font-family: 'Inter', sans-serif; padding: 40px 20px; }
+    .contract-shell { background: #fff; max-width: 1100px; margin: auto; border-radius: 28px; box-shadow: 0 40px 100px rgba(0,0,0,0.15); overflow: hidden; border: 1px solid #e2e8f0; }
+    
+    /* Million Dollar Header */
+    .contract-header { background: #0f172a; padding: 50px 60px; color: #fff; display: flex; justify-content: space-between; align-items: flex-end; position: relative; }
+    .contract-header::after { content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 4px; background: #38bdf8; }
+    
+    .contract-content { padding: 60px; }
+    
+    /* Professional Info Cards */
+    .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 40px; }
+    .info-card { background: #f8fafc; padding: 20px; border-radius: 16px; border: 1px solid #edf2f7; }
+    .info-label { font-size: 10px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }
+    .info-val { font-size: 15px; font-weight: 700; color: #0f172a; }
+
+    /* Service Table */
+    .service-table { width: 100%; border-collapse: collapse; margin-bottom: 50px; }
+    .service-table th { text-align: left; padding: 15px 20px; color: #64748b; font-size: 11px; text-transform: uppercase; border-bottom: 2px solid #f1f5f9; }
+    .service-table td { padding: 20px; border-bottom: 1px solid #f1f5f9; }
+
+    /* Legal Terms Area */
+    .legal-terms { background: #fff; padding: 40px; border: 1px solid #e2e8f0; border-radius: 16px; margin-bottom: 50px; line-height: 1.8; color: #334155; }
+    .pdf-embed { width: 100%; height: 600px; border: none; border-radius: 8px; }
+
+    /* Signature Boxes (No Tabs) */
+    .signature-section { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 40px; background: #f8fafc; padding: 40px; border-radius: 24px; border: 2px solid #edf2f7; }
+    .sig-box { display: flex; flex-direction: column; }
+    canvas { background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; width: 100%; height: 180px; cursor: crosshair; }
+    .typed-sig { width: 100%; padding: 15px; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 32px; font-family: 'Dancing Script', cursive; background: #fff; }
+
+    .btn-confirm { background: #16a34a; color: #fff; width: 100%; padding: 25px; border-radius: 16px; font-size: 22px; font-weight: 900; border: none; cursor: pointer; margin-top: 40px; box-shadow: 0 10px 25px rgba(22, 163, 74, 0.25); }
+    .btn-confirm:hover { background: #15803d; transform: translateY(-2px); }
+</style>
+
+<div class="contract-shell">
+    <div class="contract-header">
+        <div>
+            <div style="font-size: 32px; font-weight: 900; letter-spacing: -1px;">{{ $company->name }}</div>
+            <div style="color: #94a3b8; font-size: 14px; margin-top: 5px;">Service Agreement</div>
+        </div>
+        <div style="text-align: right;">
+            <div style="font-size: 12px; text-transform: uppercase; color: #38bdf8; font-weight: 900; letter-spacing: 2px;">Contract ID</div>
+            <div style="font-size: 42px; font-weight: 900; line-height: 1;">#{{ $quote->quote_number }}</div>
+        </div>
+    </div>
+
+    <div class="contract-content">
+        @if(session('success')) <div style="background:#f0fdf4; border:1px solid #16a34a; color:#16a34a; padding:20px; border-radius:12px; margin-bottom:30px; font-weight:700; text-align:center;">{{ session('success') }}</div> @endif
+
+        {{-- From/To Cards --}}
+        <div class="info-grid">
+            <div class="info-card"><span class="info-label">From Provider</span><div class="info-val">{{ $company->name }}</div></div>
+            <div class="info-card"><span class="info-label">Prepared For</span><div class="info-val">{{ $customer->name }}</div></div>
+            <div class="info-card"><span class="info-label">Agreement Date</span><div class="info-val">{{ $fmtDate($quote->quote_date) }}</div></div>
+            <div class="info-card" style="background:#0f172a;"><span class="info-label" style="color:#38bdf8;">Contract Value</span><div class="info-val" style="color:#fff; font-size:18px;">${{ number_format($total, 2) }}</div></div>
         </div>
 
-        <div class="card-body p-5">
+        {{-- Service Breakdown --}}
+        <h3 style="margin-bottom: 20px; font-weight: 900; color: #0f172a;">I. Project Scope & Pricing</h3>
+        <table class="service-table">
+            <thead>
+                <tr><th>Description</th><th width="80">Qty</th><th width="150" style="text-align:right;">Total</th></tr>
+            </thead>
+            <tbody>
+                @foreach($items as $item)
+                <tr>
+                    <td><strong>{{ $item['service'] }}</strong>@if(!empty($item['description']))<div style="font-size:13px; color:#64748b; margin-top:5px;">{{ $item['description'] }}</div>@endif</td>
+                    <td style="text-align:center;">{{ $item['qty'] }}</td>
+                    <td style="text-align:right; font-weight:800;">${{ number_format(($item['qty'] ?? 0) * ($item['price'] ?? 0), 2) }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
 
-            {{-- If uploaded contract PDF exists, show it --}}
-            @if(!empty($selectedContractUrl))
-                <h5 class="fw-bold border-bottom pb-2 text-primary text-uppercase small">Selected Contract</h5>
-                <div class="mb-5 mt-3">
-                    <iframe
-                        src="{{ $selectedContractUrl }}"
-                        style="width: 100%; height: 900px; border: 1px solid #cbd5e1; border-radius: 16px; background: #fff;">
-                    </iframe>
-                </div>
+        {{-- Legal Agreement Body --}}
+        <h3 style="margin-bottom: 20px; font-weight: 900; color: #0f172a;">II. Terms & Conditions</h3>
+        <div class="legal-terms">
+            @if($contractFileUrl)
+                <iframe src="{{ $contractFileUrl }}#toolbar=0" class="pdf-embed"></iframe>
             @else
-                {{-- Legacy fallback HTML contract --}}
-                <h5 class="fw-bold border-bottom pb-2 text-primary text-uppercase small">Project Financials</h5>
-                <div class="bg-light p-4 rounded-4 mb-4">
-                    <table class="table table-borderless m-0">
-                        <thead>
-                            <tr class="small text-muted text-uppercase">
-                                <th>Service</th>
-                                <th class="text-center">Qty</th>
-                                <th class="text-end">Line Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($quote->items as $item)
-                            <tr class="border-bottom">
-                                <td class="py-3 fw-bold">{{ $item->service_name }}</td>
-                                <td class="py-3 text-center">{{ (int)$item->quantity }}</td>
-                                <td class="py-3 text-end fw-bold">${{ number_format($item->line_total, 2) }}</td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                    <div class="text-end mt-3">
-                        <span class="text-muted uppercase small">Total Agreement Amount:</span>
-                        <h2 class="fw-900 text-dark">${{ number_format($quote->total, 2) }}</h2>
-                    </div>
-                </div>
-
-                <div class="row g-4 mb-5">
-                    <div class="col-md-6">
-                        <div class="p-4 border border-info rounded-4 bg-white shadow-sm">
-                            <p class="mb-1 text-uppercase small fw-bold text-info">Draw #1 – Deposit</p>
-                            <h3 class="fw-bold text-dark">${{ number_format($quote->deposit_amount, 2) }}</h3>
-                            <p class="small text-muted mb-0">Required for activation.</p>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="p-4 border rounded-4 bg-light shadow-sm">
-                            <p class="mb-1 text-uppercase small fw-bold text-muted">Draw #2 – Final Balance</p>
-                            <h3 class="fw-bold text-dark">${{ number_format($quote->total - $quote->deposit_amount, 2) }}</h3>
-                            <p class="small text-muted mb-0">Due upon completion.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <h5 class="fw-bold border-bottom pb-2 text-primary text-uppercase small">Terms & Conditions</h5>
-                <div class="mt-3 small text-muted" style="line-height: 1.7; max-height: 400px; overflow-y: auto; padding: 20px; border: 1px solid #f1f5f9; background: #fafafa; border-radius: 15px;">
-                    <p><strong>CANCELLATION FEE:</strong> If the Customer decides to cancel this Agreement after signing, a <strong>cancellation fee of 10%</strong> will be applied.</p>
-                    <p><strong>ACCEPTANCE:</strong> Digital signature constitutes a binding contract and authorization to begin work.</p>
-                    <p>{!! nl2br(e($quote->customer_notes)) !!}</p>
-                </div>
+                <div style="padding: 50px; text-align: center; color: #94a3b8;">Legal template not found.</div>
             @endif
-
-            {{-- Signature section always stays --}}
-            <div class="mt-5 pt-4 border-top">
-                <form action="{{ route('quotes.contract.sign', $quote->public_token) }}" method="POST" id="duoSignForm">
-                    @csrf
-                    <input type="hidden" name="signature_data" id="signature_data">
-
-                    <div class="row g-4">
-                        <div class="col-md-6">
-                            <label class="fw-bold text-dark text-uppercase small d-block mb-2">Step 1: Type Legal Name</label>
-                            <input type="text" name="sign_name" class="form-control form-control-lg bg-light border-0" style="font-family: 'Dancing Script', cursive; font-size: 24px;" placeholder="Full Name" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="fw-bold text-dark text-uppercase small d-flex justify-content-between mb-2">
-                                Step 2: Draw Signature
-                                <a href="javascript:void(0)" onclick="signaturePad.clear()" class="text-danger small">Clear</a>
-                            </label>
-                            <canvas id="signature-pad" style="border:1px solid #cbd5e1; border-radius:10px; width:100%; height:120px; background: #fdfdfd; cursor: crosshair;"></canvas>
-                        </div>
-                    </div>
-
-                    <button type="button" onclick="submitDuo()" class="btn btn-primary btn-lg w-100 mt-5 py-3 fw-bold shadow-lg">
-                        AUTHORIZE & ACTIVATE PROPOSAL
-                    </button>
-                </form>
-            </div>
         </div>
+
+        {{-- Signature Boxes --}}
+        <form action="{{ route('quotes.sign', $quote->public_token) }}" method="POST" id="sigForm">
+            @csrf
+            <input type="hidden" name="signature_image" id="signature_image">
+            
+            <h3 style="margin-bottom: 20px; font-weight: 900; color: #0f172a;">III. Formal Acceptance</h3>
+            <div class="signature-section">
+                <div class="sig-box">
+                    <span class="info-label">Type Your Full Name</span>
+                    <input type="text" name="signature_name" class="typed-sig" placeholder="Full Name" required>
+                </div>
+                <div class="sig-box">
+                    <span class="info-label">Draw Your Signature</span>
+                    <canvas id="signature-pad"></canvas>
+                    <button type="button" onclick="pad.clear()" style="background:none; border:none; color:#ef4444; font-size:11px; font-weight:800; text-align:right; cursor:pointer; margin-top:5px;">Clear Canvas</button>
+                </div>
+            </div>
+
+            <p style="font-size: 12px; color: #94a3b8; margin-top: 30px; text-align: center; max-width: 600px; margin-left: auto; margin-right: auto;">
+                By confirming below, you legally authorize this agreement and project scope. An official copy will be sent to both parties.
+            </p>
+
+            <button type="submit" class="btn-confirm">✓ CONFIRM & LEGALLY SIGN AGREEMENT</button>
+        </form>
+    </div>
+
+    <div style="background: #38bdf8; padding: 25px; text-align: center; color: #fff; font-weight: 800; font-size: 16px; text-transform: uppercase;">
+        Questions? Contact {{ $company->name }} Support
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
 <script>
-    const canvas = document.getElementById("signature-pad");
-    const signaturePad = new SignaturePad(canvas);
-
-    function submitDuo() {
-        if (signaturePad.isEmpty()) {
-            alert("Please draw your signature in Step 2.");
-            return;
+    const canvas = document.getElementById('signature-pad');
+    const pad = new SignaturePad(canvas);
+    
+    document.getElementById('sigForm').onsubmit = function() {
+        if (!pad.isEmpty()) {
+            document.getElementById('signature_image').value = pad.toDataURL();
         }
-        document.getElementById('signature_data').value = signaturePad.toDataURL();
-        document.getElementById('duoSignForm').submit();
-    }
+    };
 
     function resizeCanvas() {
         const ratio = Math.max(window.devicePixelRatio || 1, 1);
         canvas.width = canvas.offsetWidth * ratio;
         canvas.height = canvas.offsetHeight * ratio;
         canvas.getContext("2d").scale(ratio, ratio);
+        pad.clear();
     }
-
     window.onresize = resizeCanvas;
     resizeCanvas();
 </script>
-
-<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
 @endsection

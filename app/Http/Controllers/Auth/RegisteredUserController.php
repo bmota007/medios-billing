@@ -5,81 +5,57 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Company;
-use App\Helpers\StripeHelper;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules;
-use Illuminate\Support\Str;
 
 class RegisteredUserController extends Controller
 {
-    public function create()
+    public function create(Request $request)
     {
-        return view('auth.register');
+        // Capture plan from URL
+        $plan = $request->get('plan');
+
+        return view('auth.register', compact('plan'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'company_name' => ['required', 'string', 'max:255'],
-            'name'         => ['required', 'string', 'max:255'],
-            'email'        => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password'     => ['required', 'confirmed', Rules\Password::defaults()],
-            'plan'         => ['required', 'in:starter,growth,premium'],
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|confirmed|min:6',
         ]);
 
-        $plan   = strtolower($request->plan);
-        $amount = StripeHelper::monthlyAmount($plan);
+        // 🔥 CAPTURE PLAN
+        $plan = $request->get('plan', 'starter');
 
-        /*
-        |--------------------------------------------------------------------------
-        | CREATE COMPANY (LOCKED UNTIL CARD ADDED)
-        |--------------------------------------------------------------------------
-        */
-
+        // CREATE COMPANY
         $company = Company::create([
-            'name'                    => $request->company_name,
-            'email'                   => $request->email,
-            'subdomain'               => Str::slug($request->company_name),
-
-            'plan'                    => ucfirst($plan),
-            'plan_name'               => ucfirst($plan),
-            'monthly_price'           => $amount,
-            'billing_cycle'           => 'monthly',
-
-            'subscription_status'     => 'pending_checkout',
-            'subscription_started_at' => null,
-            'trial_ends_at'           => null,
-
-            'is_active'               => false,
-            'status'                  => 'Pending Payment',
+            'name' => $request->name,
+            'email' => $request->email,
+            'plan' => $plan,
+            'subscription_status' => 'pending_checkout',
+            'status' => 'Pending Payment',
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | CREATE USER
-        |--------------------------------------------------------------------------
-        */
-
+        // CREATE USER
         $user = User::create([
-            'name'       => $request->name,
-            'email'      => $request->email,
-            'password'   => Hash::make($request->password),
             'company_id' => $company->id,
-            'role'       => 'owner',
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role' => 'owner',
+            'is_active' => 1,
+            'force_password_change' => 1,
         ]);
 
         event(new Registered($user));
+
         Auth::login($user);
 
-        /*
-        |--------------------------------------------------------------------------
-        | SEND TO STRIPE CHECKOUT
-        |--------------------------------------------------------------------------
-        */
-
-        return redirect()->route('checkout.subscribe', $company->id);
+        // 🔥 REDIRECT TO STRIPE CHECKOUT
+        return redirect()->route('checkout.subscribe', ['companyId' => $company->id]);
     }
 }

@@ -1,0 +1,1558 @@
+@extends('layouts.app')
+
+@section('content')
+
+<div class="mb-admin-wrap">
+
+    {{-- TOP BAR --}}
+    <div class="mb-topbar mb-space">
+        <div class="mb-hero-card">
+            <div class="mb-hero-copy">
+                <h1 class="mb-title">
+                    Good {{ now()->hour < 12 ? 'Morning' : (now()->hour < 17 ? 'Afternoon' : 'Evening') }}, Medios 👋
+                </h1>
+                <p class="mb-subtitle">Welcome back to your command center</p>
+            </div>
+        </div>
+
+        <div class="mb-top-right">
+            <div class="mb-pill">
+                <span class="mb-pill-icon">☀️</span>
+                <div>
+                    <div class="mb-pill-main">74°F Houston</div>
+                    <div class="mb-pill-sub">Live weather tile</div>
+                </div>
+            </div>
+
+            <div class="mb-pill">
+                <span class="mb-pill-icon">📅</span>
+                <div>
+                    <div class="mb-pill-main">{{ now()->format('l, F j, Y') }}</div>
+                    <div class="mb-pill-sub">Current date</div>
+                </div>
+            </div>
+
+            <div class="mb-pill mb-pill-success">
+                <span class="mb-pill-icon">🛡️</span>
+                <div>
+                    <div class="mb-pill-main">All Systems Operational</div>
+                    <div class="mb-pill-sub">Platform status</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- KPI ROW --}}
+    <div class="mb-kpi-grid mb-space">
+
+        <div class="mb-kpi-card">
+            <div class="mb-kpi-head">
+                <div class="mb-kpi-icon kpi-purple">
+                    <i class="fa-solid fa-dollar-sign"></i>
+                </div>
+                <div class="mb-kpi-badge up">
+                    <i class="fa-solid fa-arrow-trend-up"></i>
+                    {{ number_format($growthRate ?? 0, 1) }}%
+                </div>
+            </div>
+
+            <div class="mb-kpi-label">Monthly Recurring Revenue</div>
+            <div class="mb-kpi-value">${{ number_format($mrr ?? 0, 2) }}</div>
+            <div class="mb-kpi-foot">from last month</div>
+
+            <div class="mb-mini-chart">
+                <canvas id="sparkMrr"></canvas>
+            </div>
+        </div>
+
+        <div class="mb-kpi-card">
+            <div class="mb-kpi-head">
+                <div class="mb-kpi-icon kpi-blue">
+                    <i class="fa-solid fa-building"></i>
+                </div>
+                <div class="mb-kpi-badge neutral">
+                    <i class="fa-solid fa-circle"></i>
+                    {{ $activeCompanies ?? 0 }} live
+                </div>
+            </div>
+
+            <div class="mb-kpi-label">Active Companies</div>
+            <div class="mb-kpi-value">{{ $activeCompanies ?? 0 }}</div>
+            <div class="mb-kpi-foot">tenant businesses online</div>
+
+            <div class="mb-mini-chart">
+                <canvas id="sparkCompanies"></canvas>
+            </div>
+        </div>
+
+        <div class="mb-kpi-card">
+            <div class="mb-kpi-head">
+                <div class="mb-kpi-icon kpi-green">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+                <div class="mb-kpi-badge up">
+                    <i class="fa-solid fa-arrow-trend-up"></i>
+                    {{ $totalSubscriptions ?? 0 }}
+                </div>
+            </div>
+
+            <div class="mb-kpi-label">Total Subscriptions</div>
+            <div class="mb-kpi-value">{{ $totalSubscriptions ?? 0 }}</div>
+            <div class="mb-kpi-foot">active, trial, past due, cancelled</div>
+
+            <div class="mb-mini-chart">
+                <canvas id="sparkSubs"></canvas>
+            </div>
+        </div>
+
+        <div class="mb-kpi-card">
+            <div class="mb-kpi-head">
+                <div class="mb-kpi-icon kpi-amber">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="mb-kpi-badge up">
+                    <i class="fa-solid fa-check"></i>
+                    {{ $platformHealth ?? 100 }}%
+                </div>
+            </div>
+
+            <div class="mb-kpi-label">Platform Health</div>
+            <div class="mb-kpi-value">{{ $platformHealth ?? 100 }}%</div>
+            <div class="mb-kpi-foot">healthy active tenant ratio</div>
+
+            <div class="mb-mini-chart">
+                <canvas id="sparkHealth"></canvas>
+            </div>
+        </div>
+
+        <div class="mb-kpi-card">
+            <div class="mb-kpi-head">
+                <div class="mb-kpi-icon kpi-cyan">
+                    <i class="fa-solid fa-money-bill-trend-up"></i>
+                </div>
+                <div class="mb-kpi-badge up">
+                    <i class="fa-solid fa-arrow-trend-up"></i>
+                    revenue
+                </div>
+            </div>
+
+            <div class="mb-kpi-label">Total Revenue (All Time)</div>
+            <div class="mb-kpi-value">${{ number_format($totalRevenue ?? 0, 2) }}</div>
+            <div class="mb-kpi-foot">platform subscription revenue</div>
+
+            <div class="mb-mini-chart">
+                <canvas id="sparkRevenue"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    {{-- MIDDLE ROW --}}
+    <div class="mb-main-grid mb-space">
+
+        <div class="mb-panel mb-panel-chart">
+            <div class="mb-panel-head">
+                <div>
+                    <h3>Revenue Overview</h3>
+                    <div class="mb-panel-statline">
+                        <span class="mb-panel-amount">${{ number_format($mrr ?? 0, 2) }}</span>
+                        <span class="mb-panel-growth">
+                            <i class="fa-solid fa-arrow-trend-up"></i>
+                            {{ number_format($growthRate ?? 0, 1) }}%
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mb-panel-select">
+                    This Year
+                    <i class="fa-solid fa-chevron-down"></i>
+                </div>
+            </div>
+
+            <div class="mb-chart-wrap">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+
+        <div class="mb-panel mb-panel-donut">
+            <div class="mb-panel-head">
+                <h3>Subscription Status</h3>
+                <span class="mb-link-muted">Live mix</span>
+            </div>
+
+            <div class="mb-donut-wrap">
+                <div class="mb-donut-canvas">
+                    <canvas id="subscriptionChart"></canvas>
+                    <div class="mb-donut-center">
+                        <div class="mb-donut-total">{{ $totalSubscriptions ?? 0 }}</div>
+                        <div class="mb-donut-label">Total</div>
+                    </div>
+                </div>
+
+                <div class="mb-donut-legend">
+                    <div class="mb-legend-row">
+                        <span class="mb-dot green"></span>
+                        <span>Active</span>
+                        <strong>{{ $subscriptionStats['active'] ?? 0 }}</strong>
+                    </div>
+                    <div class="mb-legend-row">
+                        <span class="mb-dot amber"></span>
+                        <span>Past Due</span>
+                        <strong>{{ $subscriptionStats['past_due'] ?? 0 }}</strong>
+                    </div>
+                    <div class="mb-legend-row">
+                        <span class="mb-dot blue"></span>
+                        <span>Trial</span>
+                        <strong>{{ $subscriptionStats['trial'] ?? 0 }}</strong>
+                    </div>
+                    <div class="mb-legend-row">
+                        <span class="mb-dot red"></span>
+                        <span>Cancelled</span>
+                        <strong>{{ $subscriptionStats['cancelled'] ?? 0 }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <a href="{{ route('admin.sales.subscriptions') }}" class="mb-panel-link">
+                View All Subscriptions
+                <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+
+        <div class="mb-panel mb-panel-stripe">
+            <div class="mb-panel-head">
+                <h3>Stripe Health Status</h3>
+                <span class="mb-live-text">Live Status</span>
+            </div>
+
+            <div class="mb-health-list">
+                <div class="mb-health-row">
+                    <div class="mb-health-left">
+                        <i class="fa-regular fa-file-lines"></i>
+                        <span>Mode</span>
+                    </div>
+                    <strong class="ok">{{ $healthyStripeCount > 0 ? 'Live / Ready' : 'Needs Review' }}</strong>
+                </div>
+
+                <div class="mb-health-row">
+                    <div class="mb-health-left">
+                        <i class="fa-solid fa-tower-broadcast"></i>
+                        <span>Webhook</span>
+                    </div>
+                    <strong class="ok">Connected</strong>
+                </div>
+
+                <div class="mb-health-row">
+                    <div class="mb-health-left">
+                        <i class="fa-solid fa-circle-nodes"></i>
+                        <span>API Connection</span>
+                    </div>
+                    <strong class="ok">Healthy</strong>
+                </div>
+
+                <div class="mb-health-row">
+                    <div class="mb-health-left">
+                        <i class="fa-regular fa-clock"></i>
+                        <span>Last Payment</span>
+                    </div>
+                    <strong>{{ optional($platformInvoices->first())->created_at ? optional($platformInvoices->first()->created_at)->format('M d, Y g:i A') : 'No recent data' }}</strong>
+                </div>
+
+                <div class="mb-health-row no-border">
+                    <div class="mb-health-left">
+                        <i class="fa-solid fa-shield"></i>
+                        <span>Status</span>
+                    </div>
+                    <strong class="ok">Healthy</strong>
+                </div>
+            </div>
+
+            <a href="{{ route('admin.billing') }}" class="mb-panel-link">
+                View Stripe Health
+                <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+
+    </div>
+    {{-- COMMAND CENTER --}}
+    <div class="mb-panel mb-space">
+        <div class="mb-panel-head mb-command-head">
+            <div>
+                <h3>Platform Command Center</h3>
+                <p>Quick actions to manage your SaaS platform</p>
+            </div>
+        </div>
+
+        <div class="mb-command-grid">
+
+            <a href="{{ route('admin.companies.create') }}" class="mb-command-card">
+                <div class="mb-command-icon purple">
+                    <i class="fa-solid fa-user-plus"></i>
+                </div>
+                <div class="mb-command-body">
+                    <strong>Add New Company</strong>
+                    <span>Onboard a new tenant</span>
+                </div>
+                <div class="mb-command-arrow">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+            </a>
+
+            <a href="{{ route('admin.companies') }}" class="mb-command-card">
+                <div class="mb-command-icon blue">
+                    <i class="fa-solid fa-building"></i>
+                </div>
+                <div class="mb-command-body">
+                    <strong>View Companies</strong>
+                    <span>Manage all tenants</span>
+                </div>
+                <div class="mb-command-arrow">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+            </a>
+
+            <a href="{{ route('admin.billing') }}" class="mb-command-card">
+                <div class="mb-command-icon green">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                </div>
+                <div class="mb-command-body">
+                    <strong>Platform Invoices</strong>
+                    <span>View all invoices</span>
+                </div>
+                <div class="mb-command-arrow">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+            </a>
+
+            <a href="{{ route('admin.sales.overview') }}" class="mb-command-card">
+                <div class="mb-command-icon amber">
+                    <i class="fa-solid fa-chart-column"></i>
+                </div>
+                <div class="mb-command-body">
+                    <strong>Revenue Reports</strong>
+                    <span>Analytics & insights</span>
+                </div>
+                <div class="mb-command-arrow">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+            </a>
+
+            <a href="{{ route('admin.sales.subscriptions') }}" class="mb-command-card">
+                <div class="mb-command-icon cyan">
+                    <i class="fa-solid fa-credit-card"></i>
+                </div>
+                <div class="mb-command-body">
+                    <strong>Subscriptions</strong>
+                    <span>Plan monitoring</span>
+                </div>
+                <div class="mb-command-arrow">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+            </a>
+
+            <a href="{{ route('admin.sales.onboarding') }}" class="mb-command-card">
+                <div class="mb-command-icon rose">
+                    <i class="fa-solid fa-headset"></i>
+                </div>
+                <div class="mb-command-body">
+                    <strong>Manual Onboarding</strong>
+                    <span>Support and setup flow</span>
+                </div>
+                <div class="mb-command-arrow">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+            </a>
+
+        </div>
+    </div>
+
+    {{-- BOTTOM ROW --}}
+    <div class="mb-bottom-grid">
+
+        <div class="mb-panel">
+            <div class="mb-panel-head">
+                <h3>Platform At a Glance</h3>
+            </div>
+
+            <div class="mb-glance-grid">
+                <div class="mb-glance-item">
+                    <span>Total Tenants</span>
+                    <strong>{{ $totalCompanies ?? 0 }}</strong>
+                    <small>Active companies</small>
+                </div>
+
+                <div class="mb-glance-item">
+                    <span>MRR</span>
+                    <strong>${{ number_format($mrr ?? 0, 0) }}</strong>
+                    <small>Monthly recurring</small>
+                </div>
+
+                <div class="mb-glance-item">
+                    <span>Growth Rate</span>
+                    <strong class="up">{{ number_format($growthRate ?? 0, 1) }}%</strong>
+                    <small>vs last month</small>
+                </div>
+
+                <div class="mb-glance-item">
+                    <span>Churn Rate</span>
+                    <strong class="down">{{ number_format($churnRate ?? 0, 1) }}%</strong>
+                    <small>This month</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-panel">
+            <div class="mb-panel-head">
+                <h3>Recent Platform Activity</h3>
+            </div>
+
+            <div class="mb-activity-list">
+                @forelse($recentActivity as $item)
+                    <div class="mb-activity-row">
+                        <div class="mb-activity-left">
+                            <span class="mb-activity-icon">
+                                @if(($item['icon'] ?? '') === 'building')
+                                    <i class="fa-solid fa-building"></i>
+                                @elseif(($item['icon'] ?? '') === 'receipt')
+                                    <i class="fa-solid fa-receipt"></i>
+                                @else
+                                    <i class="fa-solid fa-bolt"></i>
+                                @endif
+                            </span>
+
+                            <div>
+                                <div class="mb-activity-title">{{ $item['title'] ?? 'Activity recorded' }}</div>
+                                <div class="mb-activity-time">{{ $item['time'] ?? '' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                @empty
+                    <div class="mb-empty-state">No recent activity yet.</div>
+                @endforelse
+            </div>
+
+            <a href="{{ route('admin.sales.overview') }}" class="mb-panel-link">
+                View All Activity
+                <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+
+        <div class="mb-panel">
+            <div class="mb-panel-head">
+                <h3>Quick Insights</h3>
+            </div>
+
+            <div class="mb-insights-list">
+                <div class="mb-health-row">
+                    <div class="mb-health-left">
+                        <i class="fa-regular fa-circle-check"></i>
+                        <span>Best Performing Plan</span>
+                    </div>
+                    <strong class="ok">{{ $bestPlan->plan_name ?? 'Not enough data' }}</strong>
+                </div>
+
+                <div class="mb-health-row">
+                    <div class="mb-health-left">
+                        <i class="fa-regular fa-circle-user"></i>
+                        <span>Most Active Company</span>
+                    </div>
+                    <strong>{{ $mostActiveCompany->name ?? 'No active company' }}</strong>
+                </div>
+
+                <div class="mb-health-row no-border">
+                    <div class="mb-health-left">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span>Total Revenue (All Time)</span>
+                    </div>
+                    <strong class="accent">${{ number_format($totalRevenue ?? 0, 2) }}</strong>
+                </div>
+            </div>
+
+            <a href="{{ route('admin.billing') }}" class="mb-panel-link">
+                View Full Analytics
+                <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+
+    </div>
+
+    <div class="mb-footer">
+        © {{ now()->year }} Medios Billing. All rights reserved.
+        <span class="mb-version">v2.0.0</span>
+    </div>
+
+</div>
+
+@endsection
+
+@push('page_scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const revenueCtx = document.getElementById('revenueChart');
+    if (revenueCtx) {
+        const gradient = revenueCtx.getContext('2d').createLinearGradient(0, 0, 0, 360);
+        gradient.addColorStop(0, 'rgba(124, 58, 237, 0.45)');
+        gradient.addColorStop(1, 'rgba(124, 58, 237, 0.02)');
+
+        new Chart(revenueCtx, {
+            type: 'line',
+            data: {
+                labels: @json($monthLabels),
+                datasets: [{
+                    label: 'Revenue',
+                    data: @json($monthlyRevenue),
+                    borderColor: '#7c3aed',
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.42,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#60a5fa',
+                    pointBorderColor: '#c4b5fd',
+                    pointBorderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        borderColor: 'rgba(255,255,255,.08)',
+                        borderWidth: 1,
+                        titleColor: '#fff',
+                        bodyColor: '#cbd5e1',
+                        callbacks: {
+                            label: function(context) {
+                                return '$' + Number(context.parsed.y).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: 'rgba(255,255,255,.035)' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#94a3b8',
+                            callback: function(value) {
+                                return '$' + Number(value).toLocaleString();
+                            }
+                        },
+                        grid: { color: 'rgba(255,255,255,.045)' }
+                    }
+                }
+            }
+        });
+    }
+
+    const subCtx = document.getElementById('subscriptionChart');
+    if (subCtx) {
+        new Chart(subCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Active', 'Past Due', 'Trial', 'Cancelled'],
+                datasets: [{
+                    data: [
+                        {{ $subscriptionStats['active'] ?? 0 }},
+                        {{ $subscriptionStats['past_due'] ?? 0 }},
+                        {{ $subscriptionStats['trial'] ?? 0 }},
+                        {{ $subscriptionStats['cancelled'] ?? 0 }}
+                    ],
+                    backgroundColor: ['#22c55e', '#f59e0b', '#3b82f6', '#ef4444'],
+                    borderColor: ['#22c55e', '#f59e0b', '#3b82f6', '#ef4444'],
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                cutout: '72%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        borderColor: 'rgba(255,255,255,.08)',
+                        borderWidth: 1,
+                        titleColor: '#fff',
+                        bodyColor: '#cbd5e1'
+                    }
+                }
+            }
+        });
+    }
+
+    const sparkConfigs = [
+        { id: 'sparkMrr', color: '#8b5cf6', fill: 'rgba(139,92,246,.18)', data: [9,14,12,11,13,15,14,12,13,16,17,20] },
+        { id: 'sparkCompanies', color: '#3b82f6', fill: 'rgba(59,130,246,.16)', data: [4,5,5,6,5,7,8,8,9,10,10,11] },
+        { id: 'sparkSubs', color: '#22c55e', fill: 'rgba(34,197,94,.16)', data: [18,22,21,24,28,26,30,33,31,36,34,39] },
+        { id: 'sparkHealth', color: '#f59e0b', fill: 'rgba(245,158,11,.12)', data: [98,99,99,99,100,100,100,100,100,100,100,100] },
+        { id: 'sparkRevenue', color: '#06b6d4', fill: 'rgba(6,182,212,.14)', data: [11,15,14,17,13,19,18,18,17,23,22,27] }
+    ];
+
+    sparkConfigs.forEach(function(item) {
+        const el = document.getElementById(item.id);
+        if (!el) return;
+
+        const ctx = el.getContext('2d');
+        const grad = ctx.createLinearGradient(0, 0, 0, 70);
+        grad.addColorStop(0, item.fill);
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+        new Chart(el, {
+            type: 'line',
+            data: {
+                labels: item.data.map((_, i) => i + 1),
+                datasets: [{
+                    data: item.data,
+                    borderColor: item.color,
+                    backgroundColor: grad,
+                    fill: true,
+                    tension: 0.42,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 1400,
+                    easing: 'easeOutQuart'
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                },
+                scales: {
+                    x: { display: false },
+                    y: { display: false }
+                }
+            }
+        });
+    });
+});
+</script>
+@endpush
+
+@push('page_styles')
+<style>
+.mb-dashboard-wrap{
+    max-width: 1820px;
+    margin: 0 auto;
+}
+
+.mb-space{
+    margin-bottom: 24px;
+}
+
+.mb-topbar{
+    display:grid;
+    grid-template-columns: 1.35fr .62fr .78fr .78fr .9fr;
+    gap:18px;
+    align-items:stretch;
+    margin-bottom:24px;
+}
+
+.mb-hero-card{
+    background:
+        radial-gradient(circle at top left, rgba(59,130,246,.12), transparent 32%),
+        linear-gradient(135deg, #081120 0%, #0b1730 48%, #091224 100%);
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:24px;
+    padding:28px 30px;
+    box-shadow:0 18px 45px rgba(0,0,0,.28);
+}
+
+.mb-hero-card h1{
+    margin:0;
+    font-size:52px;
+    line-height:1.02;
+    font-weight:800;
+    color:#fff;
+    letter-spacing:-1.3px;
+}
+
+.mb-hero-card p{
+    margin:12px 0 0 0;
+    color:#94a3b8;
+    font-size:18px;
+}
+
+.mb-top-pill{
+    min-height:122px;
+    border-radius:22px;
+    padding:22px;
+    border:1px solid rgba(255,255,255,.06);
+    background:linear-gradient(180deg, rgba(11,18,32,.95), rgba(9,17,30,.92));
+    box-shadow:0 12px 34px rgba(0,0,0,.22);
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+}
+
+.mb-top-pill-icon{
+    font-size:20px;
+    margin-bottom:14px;
+}
+
+.mb-top-pill-title{
+    color:#fff;
+    font-size:15px;
+    font-weight:700;
+    line-height:1.3;
+}
+
+.mb-top-pill-sub{
+    color:#94a3b8;
+    font-size:13px;
+    margin-top:6px;
+}
+
+.mb-top-pill.good .mb-top-pill-icon{ color:#facc15; }
+.mb-top-pill.date .mb-top-pill-icon{ color:#93c5fd; }
+.mb-top-pill.health .mb-top-pill-icon{ color:#22c55e; }
+.mb-top-pill.profile{
+    flex-direction:row;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:14px;
+}
+
+.mb-profile-left{
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+}
+
+.mb-avatar{
+    width:52px;
+    height:52px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#8b5cf6,#6366f1);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    font-weight:800;
+    font-size:20px;
+    box-shadow:0 10px 24px rgba(99,102,241,.28);
+    flex-shrink:0;
+}
+
+.mb-profile-name{
+    color:#fff;
+    font-size:18px;
+    font-weight:700;
+    line-height:1.2;
+    margin-top:2px;
+}
+
+.mb-profile-role{
+    color:#94a3b8;
+    font-size:13px;
+    margin-top:4px;
+}
+
+.mb-profile-caret{
+    color:#cbd5e1;
+    font-size:14px;
+    margin-top:6px;
+}
+
+.mb-kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(5, minmax(0, 1fr));
+    gap:18px;
+    margin-bottom:24px;
+}
+
+.mb-kpi-card{
+    position:relative;
+    overflow:hidden;
+    border-radius:22px;
+    padding:18px 18px 12px;
+    border:1px solid rgba(255,255,255,.06);
+    background:
+        radial-gradient(circle at top left, rgba(255,255,255,.03), transparent 28%),
+        linear-gradient(180deg,#0b1220 0%, #0a1630 100%);
+    box-shadow:0 12px 34px rgba(0,0,0,.24);
+    transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+
+.mb-kpi-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 18px 40px rgba(0,0,0,.32);
+    border-color:rgba(255,255,255,.12);
+}
+
+.mb-kpi-top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+}
+
+.mb-kpi-icon{
+    width:58px;
+    height:58px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    font-size:24px;
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.mb-kpi-icon.purple{ background:linear-gradient(135deg, rgba(124,58,237,.48), rgba(76,29,149,.62)); }
+.mb-kpi-icon.blue{ background:linear-gradient(135deg, rgba(37,99,235,.5), rgba(30,64,175,.64)); }
+.mb-kpi-icon.green{ background:linear-gradient(135deg, rgba(34,197,94,.44), rgba(21,128,61,.64)); }
+.mb-kpi-icon.amber{ background:linear-gradient(135deg, rgba(245,158,11,.42), rgba(161,98,7,.65)); }
+.mb-kpi-icon.cyan{ background:linear-gradient(135deg, rgba(6,182,212,.4), rgba(14,116,144,.66)); }
+
+.mb-kpi-label{
+    color:#cbd5e1;
+    font-size:14px;
+    margin-top:14px;
+}
+
+.mb-kpi-value{
+    color:#fff;
+    font-size:42px;
+    font-weight:800;
+    line-height:1.05;
+    margin-top:6px;
+    letter-spacing:-1px;
+}
+
+.mb-kpi-foot{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:8px;
+    min-height:22px;
+}
+
+.mb-kpi-change{
+    color:#22c55e;
+    font-size:14px;
+    font-weight:700;
+}
+
+.mb-kpi-note{
+    color:#94a3b8;
+    font-size:14px;
+}
+
+.mb-kpi-spark{
+    margin-top:10px;
+    height:42px;
+}
+
+.mb-main-grid{
+    display:grid;
+    grid-template-columns:2.2fr 1.3fr 1.1fr;
+    gap:18px;
+    margin-bottom:24px;
+}
+.mb-bottom-grid{
+    display:grid;
+    grid-template-columns:1.45fr 1.1fr 1.05fr;
+    gap:18px;
+    margin-bottom:20px;
+}
+
+.mb-panel{
+    border-radius:24px;
+    border:1px solid rgba(255,255,255,.06);
+    background:
+        radial-gradient(circle at top left, rgba(59,130,246,.05), transparent 26%),
+        linear-gradient(180deg,#0b1220 0%, #0a1429 100%);
+    box-shadow:0 14px 36px rgba(0,0,0,.24);
+    padding:26px;
+    transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+
+.mb-panel:hover{
+    transform:translateY(-3px);
+    box-shadow:0 20px 44px rgba(0,0,0,.30);
+    border-color:rgba(255,255,255,.1);
+}
+
+.mb-panel-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:20px;
+}
+
+.mb-panel-head h3{
+    margin:0;
+    color:#fff;
+    font-size:18px;
+    font-weight:800;
+    letter-spacing:-.2px;
+}
+
+.mb-panel-head p{
+    margin:6px 0 0 0;
+    color:#94a3b8;
+    font-size:14px;
+}
+
+.mb-panel-chip{
+    padding:11px 14px;
+    border-radius:14px;
+    background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.06);
+    color:#fff;
+    font-size:14px;
+    font-weight:600;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+}
+
+.mb-chart-wrap{
+    height:330px;
+}
+
+.mb-subscription-wrap{
+    display:grid;
+    grid-template-columns:210px 1fr;
+    gap:18px;
+    align-items:center;
+}
+
+.mb-donut-wrap{
+    position:relative;
+    width:200px;
+    height:200px;
+    margin:0 auto;
+}
+
+.mb-donut-center{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+}
+
+.mb-donut-center strong{
+    color:#fff;
+    font-size:52px;
+    line-height:1;
+    font-weight:800;
+}
+
+.mb-donut-center span{
+    color:#94a3b8;
+    font-size:15px;
+    margin-top:6px;
+}
+
+.mb-sub-legend{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+
+.mb-sub-row{
+    display:grid;
+    grid-template-columns:14px 1fr auto auto;
+    align-items:center;
+    gap:10px;
+    font-size:14px;
+    color:#cbd5e1;
+}
+
+.mb-sub-dot{
+    width:10px;
+    height:10px;
+    border-radius:3px;
+}
+
+.mb-sub-dot.green{ background:#22c55e; }
+.mb-sub-dot.yellow{ background:#f59e0b; }
+.mb-sub-dot.blue{ background:#3b82f6; }
+.mb-sub-dot.red{ background:#ef4444; }
+
+.mb-sub-row strong{
+    color:#fff;
+    font-weight:700;
+}
+
+.mb-sub-row small{
+    color:#94a3b8 !important;
+    font-size:13px;
+}
+
+.mb-panel-link{
+    margin-top:18px;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    color:#60a5fa;
+    text-decoration:none;
+    font-weight:600;
+    font-size:14px;
+}
+
+.mb-panel-link:hover{
+    color:#93c5fd;
+}
+
+.mb-stripe-live{
+    color:#22c55e;
+    font-size:14px;
+    font-weight:700;
+}
+
+.mb-stripe-table{
+    display:flex;
+    flex-direction:column;
+    gap:0;
+}
+
+.mb-health-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    padding:14px 0;
+    border-bottom:1px solid rgba(255,255,255,.06);
+}
+
+.mb-health-row.no-border{
+    border-bottom:none;
+}
+
+.mb-health-left{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    color:#cbd5e1;
+    font-size:15px;
+}
+
+.mb-health-left i{
+    color:#cbd5e1;
+    width:18px;
+    text-align:center;
+}
+
+.mb-health-row strong{
+    color:#fff;
+    font-size:15px;
+    font-weight:700;
+}
+
+.mb-health-row strong.ok{
+    color:#22c55e;
+}
+
+.mb-health-row strong.warn{
+    color:#f59e0b;
+}
+
+.mb-health-row strong.accent{
+    color:#a855f7;
+}
+
+.mb-command-head{
+    margin-bottom:18px;
+}
+
+.mb-command-grid{
+    display:grid;
+    grid-template-columns:repeat(6, minmax(0, 1fr));
+    gap:16px;
+}
+
+.mb-command-card{
+    border-radius:18px;
+    padding:18px 16px;
+    text-decoration:none;
+    border:1px solid rgba(255,255,255,.06);
+    background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+    min-height:102px;
+    display:grid;
+    grid-template-columns:50px 1fr 22px;
+    align-items:center;
+    gap:14px;
+    transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+.mb-command-card:hover{
+    transform:translateY(-3px);
+    box-shadow:0 14px 32px rgba(0,0,0,.26);
+    border-color:rgba(255,255,255,.12);
+}
+
+.mb-command-icon{
+    width:50px;
+    height:50px;
+    border-radius:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    font-size:22px;
+    border:1px solid rgba(255,255,255,.06);
+}
+
+.mb-command-icon.purple{ background:linear-gradient(135deg,#7c3aed,#9333ea); }
+.mb-command-icon.blue{ background:linear-gradient(135deg,#2563eb,#1d4ed8); }
+.mb-command-icon.green{ background:linear-gradient(135deg,#16a34a,#22c55e); }
+.mb-command-icon.amber{ background:linear-gradient(135deg,#d97706,#f59e0b); }
+.mb-command-icon.cyan{ background:linear-gradient(135deg,#0891b2,#06b6d4); }
+.mb-command-icon.rose{ background:linear-gradient(135deg,#be185d,#e11d48); }
+
+.mb-command-body{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+}
+
+.mb-command-body strong{
+    color:#fff;
+    font-size:15px;
+    font-weight:700;
+    line-height:1.2;
+}
+
+.mb-command-body span{
+    color:#94a3b8;
+    font-size:13px;
+    line-height:1.35;
+}
+
+.mb-command-arrow{
+    color:#cbd5e1;
+    font-size:15px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.mb-glance-grid{
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:0;
+    border-radius:18px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.06);
+    background:rgba(255,255,255,.015);
+}
+
+.mb-glance-item{
+    padding:18px 18px 16px;
+    border-right:1px solid rgba(255,255,255,.06);
+}
+
+.mb-glance-item:last-child{
+    border-right:none;
+}
+
+.mb-glance-item span{
+    display:block;
+    color:#94a3b8;
+    font-size:14px;
+    margin-bottom:10px;
+}
+
+.mb-glance-item strong{
+    display:block;
+    color:#fff;
+    font-size:22px;
+    font-weight:800;
+    line-height:1.1;
+}
+
+.mb-glance-item strong.up{
+    color:#22c55e;
+}
+
+.mb-glance-item strong.down{
+    color:#ef4444;
+}
+
+.mb-glance-item small{
+    display:block;
+    margin-top:8px;
+    color:#94a3b8 !important;
+    font-size:13px;
+}
+
+.mb-activity-list{
+    display:flex;
+    flex-direction:column;
+    gap:0;
+}
+
+.mb-activity-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:13px 0;
+    border-bottom:1px solid rgba(255,255,255,.06);
+}
+
+.mb-activity-row:last-child{
+    border-bottom:none;
+}
+
+.mb-activity-left{
+    display:flex;
+    align-items:flex-start;
+    gap:14px;
+}
+
+.mb-activity-icon{
+    width:28px;
+    height:28px;
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#cbd5e1;
+    font-size:14px;
+    margin-top:2px;
+}
+
+.mb-activity-title{
+    color:#e5eefb;
+    font-size:15px;
+    line-height:1.35;
+}
+
+.mb-activity-time{
+    color:#94a3b8;
+    font-size:13px;
+    margin-top:4px;
+}
+
+.mb-empty-state{
+    color:#94a3b8;
+    font-size:14px;
+    padding:12px 0;
+}
+.mb-insights-list{
+    display:flex;
+    flex-direction:column;
+    gap:0;
+}
+
+.mb-footer{
+    margin-top:18px;
+    text-align:center;
+    color:#94a3b8;
+    font-size:14px;
+    position:relative;
+}
+
+.mb-version{
+    position:absolute;
+    right:0;
+    color:#64748b;
+    font-size:13px;
+}
+
+@media (max-width: 1680px){
+    .mb-command-grid{
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1480px){
+    .mb-kpi-grid{
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+    }
+
+    .mb-main-grid{
+        grid-template-columns:1.6fr 1fr;
+    }
+
+    .mb-main-grid > :last-child{
+        grid-column:1 / -1;
+    }
+
+    .mb-bottom-grid{
+        grid-template-columns:1fr;
+    }
+
+    .mb-glance-grid{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1180px){
+    .mb-topbar{
+        grid-template-columns:1fr;
+    }
+
+    .mb-top-right{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+    .mb-kpi-grid{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+    .mb-main-grid{
+        grid-template-columns:1fr;
+    }
+
+    .mb-subscription-wrap{
+        grid-template-columns:1fr;
+    }
+
+    .mb-command-grid{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px){
+    .mb-dashboard-wrap{
+        padding:20px 16px 28px;
+    }
+
+    .mb-title{
+        font-size:34px;
+    }
+
+    .mb-top-right{
+        grid-template-columns:1fr;
+    }
+
+    .mb-kpi-grid{
+        grid-template-columns:1fr;
+    }
+
+    .mb-command-grid{
+        grid-template-columns:1fr;
+    }
+
+    .mb-glance-grid{
+        grid-template-columns:1fr;
+    }
+
+    .mb-glance-item{
+        border-right:none;
+        border-bottom:1px solid rgba(255,255,255,.06);
+    }
+
+    .mb-glance-item:last-child{
+        border-bottom:none;
+    }
+
+    .mb-footer{
+        text-align:left;
+        padding-bottom:24px;
+    }
+
+    .mb-version{
+        position:static;
+        display:block;
+        margin-top:8px;
+    }
+}
+</style>
+
+@push('page_scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const revenueEl = document.getElementById('revenueChart');
+
+    if (revenueEl) {
+        const revenueCtx = revenueEl.getContext('2d');
+        const revenueGradient = revenueCtx.createLinearGradient(0, 0, 0, 360);
+        revenueGradient.addColorStop(0, 'rgba(124, 58, 237, 0.42)');
+        revenueGradient.addColorStop(1, 'rgba(124, 58, 237, 0.02)');
+
+        new Chart(revenueEl, {
+            type: 'line',
+            data: {
+                labels: @json($monthLabels),
+                datasets: [{
+                    label: 'Revenue',
+                    data: @json($monthlyRevenue),
+                    borderColor: '#7c3aed',
+                    backgroundColor: revenueGradient,
+                    fill: true,
+                    tension: 0.42,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#60a5fa',
+                    pointBorderColor: '#c4b5fd',
+                    pointBorderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        borderColor: 'rgba(255,255,255,.08)',
+                        borderWidth: 1,
+                        titleColor: '#fff',
+                        bodyColor: '#cbd5e1',
+                        displayColors: false,
+                        callbacks: {
+                            label: function(context) {
+                                return '$' + Number(context.parsed.y).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                });
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#94a3b8'
+                        },
+                        grid: {
+                            color: 'rgba(255,255,255,.035)'
+                        },
+                        border: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#94a3b8',
+                            callback: function(value) {
+                                return '$' + Number(value).toLocaleString();
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255,255,255,.045)'
+                        },
+                        border: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    const subEl = document.getElementById('subscriptionChart');
+
+    if (subEl) {
+        new Chart(subEl, {
+            type: 'doughnut',
+            data: {
+                labels: ['Active', 'Past Due', 'Trial', 'Cancelled'],
+                datasets: [{
+                    data: [
+                        {{ $subscriptionStats['active'] ?? 0 }},
+                        {{ $subscriptionStats['past_due'] ?? 0 }},
+                        {{ $subscriptionStats['trial'] ?? 0 }},
+                        {{ $subscriptionStats['cancelled'] ?? 0 }}
+                    ],
+                    backgroundColor: ['#22c55e', '#f59e0b', '#3b82f6', '#ef4444'],
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: '72%',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        borderColor: 'rgba(255,255,255,.08)',
+                        borderWidth: 1,
+                        titleColor: '#fff',
+                        bodyColor: '#cbd5e1'
+                    }
+                }
+            }
+        });
+    }
+
+    const sparkConfigs = [
+        { id: 'sparkMrr', color: '#8b5cf6', fill: 'rgba(139,92,246,.18)', data: [9,14,12,11,13,15,14,12,13,16,17,20] },
+        { id: 'sparkCompanies', color: '#3b82f6', fill: 'rgba(59,130,246,.16)', data: [4,5,5,6,5,7,8,8,9,10,10,11] },
+        { id: 'sparkSubs', color: '#22c55e', fill: 'rgba(34,197,94,.16)', data: [18,22,21,24,28,26,30,33,31,36,34,39] },
+        { id: 'sparkHealth', color: '#f59e0b', fill: 'rgba(245,158,11,.12)', data: [98,99,99,99,100,100,100,100,100,100,100,100] },
+        { id: 'sparkRevenue', color: '#06b6d4', fill: 'rgba(6,182,212,.14)', data: [11,15,14,17,13,19,18,18,17,23,22,27] }
+    ];
+
+    sparkConfigs.forEach(function(item) {
+        const el = document.getElementById(item.id);
+
+        if (!el) return;
+
+        const ctx = el.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 56);
+        gradient.addColorStop(0, item.fill);
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+
+        new Chart(el, {
+            type: 'line',
+            data: {
+                labels: item.data.map((_, i) => i + 1),
+                datasets: [{
+                    data: item.data,
+                    borderColor: item.color,
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.45,
+                    borderWidth: 2.5,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 1400
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                },
+                scales: {
+                    x: { display: false },
+                    y: { display: false }
+                }
+            }
+        });
+    });
+});
+</script>
+@endpush

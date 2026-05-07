@@ -1,0 +1,410 @@
+@extends('layouts.app')
+
+@section('content')
+
+@php
+$rawPlan = strtolower($company->plan_name ?? $company->plan ?? 'starter');
+$grandfathered = in_array($company->id ?? 0, [2,3,7]);
+$plan = $grandfathered ? 'elite' : $rawPlan;
+$planLabel = ucfirst($plan);
+
+$totalRevenue    = (float)($stats['total_revenue'] ?? 0);
+$totalInvoices   = (int)($stats['total_invoices'] ?? 0);
+$paidInvoices    = (int)($stats['paid_invoices'] ?? 0);
+$pendingInvoices = (int)($stats['pending_invoices'] ?? 0);
+$customerCount   = (int)($customerCount ?? 0);
+
+$chartDataSafe = !empty($chartData)
+    ? array_values($chartData)
+    : [0,0,0,0,0,0,0,0,0,0,0,0];
+
+$growthRate = $totalRevenue > 0 ? '+18%' : '0%';
+
+$upgradeText = match($plan){
+    'starter' => 'Unlock automation, branding, reminders & faster payments.',
+    'pro'     => 'Unlock team users, AI collections & advanced reports.',
+    'elite'   => 'You are on our highest active tier.',
+    default   => 'Upgrade your business tools anytime.'
+};
+@endphp
+
+<style>
+body{
+margin:0;
+font-family:Inter,Arial,sans-serif;
+background:
+radial-gradient(circle at top right, rgba(59,130,246,.18), transparent 28%),
+radial-gradient(circle at bottom left, rgba(14,165,233,.12), transparent 25%),
+#020617;
+color:#fff;
+}
+
+.mm-wrap{
+max-width:1700px;
+margin:auto;
+padding:28px;
+}
+
+.mm-grid-top{
+display:grid;
+grid-template-columns:2fr 1fr 1fr;
+gap:20px;
+margin-bottom:20px;
+}
+
+.mm-grid-kpi{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:18px;
+margin-bottom:20px;
+}
+
+.mm-grid-main{
+display:grid;
+grid-template-columns:2fr 1fr;
+gap:20px;
+margin-bottom:20px;
+}
+
+.mm-grid-bottom{
+display:grid;
+grid-template-columns:1.3fr .7fr;
+gap:20px;
+}
+
+.mm-card{
+background:linear-gradient(180deg,#07152f,#081326);
+border:1px solid rgba(255,255,255,.06);
+border-radius:24px;
+padding:24px;
+box-shadow:0 18px 40px rgba(0,0,0,.34);
+}
+
+.mm-hero{
+padding:30px;
+}
+
+.mm-title{
+font-size:42px;
+font-weight:800;
+line-height:1.1;
+margin-bottom:8px;
+}
+
+.mm-sub{
+color:#94a3b8;
+font-size:15px;
+}
+
+.mm-plan{
+display:inline-block;
+margin-top:18px;
+padding:8px 14px;
+border-radius:999px;
+background:linear-gradient(90deg,#2563eb,#7c3aed);
+font-size:13px;
+font-weight:700;
+}
+
+.mm-metric{
+font-size:42px;
+font-weight:800;
+line-height:1;
+margin-top:12px;
+}
+
+.mm-small{
+font-size:13px;
+color:#94a3b8;
+}
+
+.mm-green{color:#22c55e;}
+.mm-blue{color:#38bdf8;}
+.mm-yellow{color:#facc15;}
+.mm-red{color:#fb7185;}
+
+.mm-kpi{
+min-height:150px;
+}
+
+.mm-kpi-label{
+font-size:13px;
+color:#94a3b8;
+}
+
+.mm-actions{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px;
+margin-top:14px;
+}
+
+.mm-btn{
+display:block;
+text-decoration:none;
+color:#fff;
+padding:14px;
+border-radius:16px;
+background:rgba(255,255,255,.03);
+border:1px solid rgba(255,255,255,.05);
+transition:.2s;
+font-size:14px;
+}
+
+.mm-btn:hover{
+background:rgba(37,99,235,.16);
+color:#fff;
+}
+
+.mm-line{
+display:flex;
+justify-content:space-between;
+gap:10px;
+padding:14px 0;
+border-bottom:1px solid rgba(255,255,255,.05);
+}
+
+.mm-line:last-child{
+border-bottom:none;
+}
+
+.mm-badge{
+padding:5px 10px;
+border-radius:999px;
+font-size:12px;
+font-weight:700;
+background:rgba(255,255,255,.06);
+}
+
+.mm-upgrade{
+margin-top:16px;
+padding:16px;
+border-radius:18px;
+background:linear-gradient(135deg,#1d4ed8,#7c3aed);
+}
+
+canvas{
+max-height:420px;
+}
+
+@media(max-width:1400px){
+.mm-grid-top,
+.mm-grid-kpi,
+.mm-grid-main,
+.mm-grid-bottom{
+grid-template-columns:1fr;
+}
+}
+
+@media(max-width:768px){
+.mm-grid-kpi{
+grid-template-columns:1fr 1fr;
+}
+.mm-title{
+font-size:30px;
+}
+.mm-metric{
+font-size:30px;
+}
+}
+</style>
+
+<div class="mm-wrap">
+
+<!-- TOP -->
+<div class="mm-grid-top">
+
+<div class="mm-card mm-hero">
+<div class="mm-title">{{ $greeting }}, {{ auth()->user()->name }} 👋</div>
+<div class="mm-sub">Welcome back to your MediosBilling Revenue Center.</div>
+
+<div class="mm-plan">{{ strtoupper($planLabel) }} PLAN</div>
+
+<div class="mm-upgrade">
+<div style="font-weight:700;">Growth Opportunity</div>
+<div class="mm-small" style="color:#dbeafe;margin-top:6px;">{{ $upgradeText }}</div>
+</div>
+</div>
+
+<div class="mm-card">
+<div class="mm-small">Total Revenue</div>
+<div class="mm-metric">${{ number_format($totalRevenue,0) }}</div>
+<div class="mm-green" style="margin-top:10px;">{{ $growthRate }} growth</div>
+</div>
+
+<div class="mm-card">
+<div class="mm-small">Stripe Status</div>
+<div class="mm-metric" style="font-size:32px;">{{ $stripeStatus }}</div>
+<div class="mm-small" style="margin-top:10px;">Payments Ready</div>
+</div>
+
+</div>
+
+<!-- KPI -->
+<div class="mm-grid-kpi">
+
+<div class="mm-card mm-kpi">
+<div class="mm-kpi-label">Invoices</div>
+<div class="mm-metric">{{ $totalInvoices }}</div>
+<div class="mm-blue">Total Created</div>
+</div>
+
+<div class="mm-card mm-kpi">
+<div class="mm-kpi-label">Paid</div>
+<div class="mm-metric">{{ $paidInvoices }}</div>
+<div class="mm-green">Collected</div>
+</div>
+
+<div class="mm-card mm-kpi">
+<div class="mm-kpi-label">Pending</div>
+<div class="mm-metric">{{ $pendingInvoices }}</div>
+<div class="mm-yellow">Needs Follow Up</div>
+</div>
+
+<div class="mm-card mm-kpi">
+<div class="mm-kpi-label">Customers</div>
+<div class="mm-metric">{{ $customerCount }}</div>
+<div class="mm-blue">Active Records</div>
+</div>
+
+<div class="mm-card mm-kpi">
+<div class="mm-kpi-label">Collection Rate</div>
+<div class="mm-metric">
+{{ $totalInvoices > 0 ? round(($paidInvoices / $totalInvoices)*100) : 0 }}%
+</div>
+<div class="mm-green">Healthy</div>
+</div>
+
+</div>
+
+<!-- MAIN -->
+<div class="mm-grid-main">
+
+<div class="mm-card">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+<div>
+<div style="font-size:22px;font-weight:800;">Revenue Performance</div>
+<div class="mm-small">Last 12 Months</div>
+</div>
+<span class="mm-badge">LIVE</span>
+</div>
+
+<div style="height:420px;">
+<canvas id="revenueChart"></canvas>
+</div>
+</div>
+
+<div class="mm-card">
+<div style="font-size:22px;font-weight:800;">Quick Actions</div>
+
+<div class="mm-actions">
+
+<a href="{{ route('invoice.create') }}" class="mm-btn">🧾 Create Invoice</a>
+<a href="{{ route('quotes.index') }}" class="mm-btn">📄 Manage Quotes</a>
+
+<a href="{{ route('customers.index') }}" class="mm-btn">👥 Customers</a>
+<a href="{{ route('company.settings') }}" class="mm-btn">⚙️ Settings</a>
+
+<a href="{{ route('subscription.portal') }}" class="mm-btn">🚀 Upgrade Plan</a>
+<a href="{{ route('invoice.history') }}" class="mm-btn">📊 Reports</a>
+
+</div>
+
+@if($pendingInvoices > 0)
+<div class="mm-upgrade">
+<div style="font-weight:700;">Cash Flow Alert</div>
+<div class="mm-small" style="color:#dbeafe;margin-top:6px;">
+You have {{ $pendingInvoices }} pending invoice(s) waiting for payment.
+</div>
+</div>
+@endif
+
+</div>
+
+</div>
+
+<!-- BOTTOM -->
+<div class="mm-grid-bottom">
+
+<div class="mm-card">
+<div style="font-size:22px;font-weight:800;margin-bottom:10px;">Recent Invoices</div>
+
+@forelse($recentInvoices as $invoice)
+<div class="mm-line">
+<div>
+<div style="font-weight:700;">#{{ $invoice->invoice_no ?? $invoice->id }}</div>
+<div class="mm-small">{{ $invoice->customer_name }}</div>
+</div>
+
+<div style="text-align:right;">
+<div style="font-weight:700;">${{ number_format($invoice->total,2) }}</div>
+<div class="mm-small">{{ strtoupper($invoice->status) }}</div>
+</div>
+</div>
+@empty
+<div class="mm-small">No invoices found.</div>
+@endforelse
+
+</div>
+
+<div class="mm-card">
+<div style="font-size:22px;font-weight:800;margin-bottom:10px;">Business Insights</div>
+
+<div class="mm-line">
+<span class="mm-small">Best Next Move</span>
+<span>Send reminders</span>
+</div>
+
+<div class="mm-line">
+<span class="mm-small">Upsell Opportunity</span>
+<span>{{ $customerCount }} clients</span>
+</div>
+
+<div class="mm-line">
+<span class="mm-small">Payment Engine</span>
+<span class="mm-green">{{ $stripeStatus }}</span>
+</div>
+
+<div class="mm-line">
+<span class="mm-small">Plan Level</span>
+<span>{{ $planLabel }}</span>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const chartData = {!! json_encode($chartDataSafe) !!};
+
+new Chart(document.getElementById('revenueChart'),{
+type:'line',
+data:{
+labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+datasets:[{
+data:chartData,
+borderColor:'#38bdf8',
+backgroundColor:'rgba(56,189,248,.12)',
+fill:true,
+tension:.42,
+borderWidth:3,
+pointRadius:4
+}]
+},
+options:{
+responsive:true,
+maintainAspectRatio:false,
+plugins:{legend:{display:false}},
+scales:{
+x:{ticks:{color:'#94a3b8'},grid:{display:false}},
+y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.04)'}}
+}
+}
+});
+</script>
+
+@endsection

@@ -1,0 +1,115 @@
+<?php
+namespace App\Http\Controllers;
+
+use App\Models\Invoice;
+use App\Models\Quote;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Stripe\Stripe;
+use Stripe\Charge;
+
+class InvoiceController extends Controller
+{
+    public function history() { 
+        $invoices = Invoice::where('company_id', auth()->user()->company_id)->latest()->get();
+        return view('invoices.index', compact('invoices'));
+    }
+
+    public function showPaymentPage($invoice_no) {
+        $invoice = Invoice::where('invoice_no', $invoice_no)->orWhere('invoice_number', $invoice_no)->firstOrFail();
+        return view('invoices.pay', ['invoice' => $invoice, 'company' => $invoice->company]);
+    }
+
+    public function pay($id) {
+        $invoice = Invoice::findOrFail($id);
+        return redirect()->route('invoice.pay', $invoice->invoice_no);
+    }
+// 🔥 DIRECT VIEW FIX (APPEND ONLY)
+public function payDirect($id)
+{
+    $invoice = Invoice::where('id', $id)
+        ->with('company', 'customer')
+        ->firstOrFail();
+
+    return view('invoices.pay', compact('invoice'));
+}
+
+    public function stripePost(Request $request, $id) {
+        $invoice = Invoice::where('id', $id)->with('customer','company')->firstOrFail();
+// 🔥 STORE PAYMENT METHOD (APPEND ONLY)
+$invoice->payment_method = $request->payment_method ?? 'card';
+$invoice->save();
+        $company = $invoice->company;
+        $isTest = ($company->billing_mode === 'test' || env('APP_BILLING_MODE') === 'test');
+        Stripe::setApiKey($isTest ? env('STRIPE_TEST_SECRET') : env('STRIPE_SECRET'));
+
+// 🔥 OVERRIDE WITH COMPANY KEYS (APPEND ONLY)
+Stripe::setApiKey(
+    $isTest
+    ? $company->stripe_test_secret_key
+    : $company->stripe_secret_key
+);
+
+        try {
+            Charge::create(["amount" => $invoice->total * 100, "currency" => "usd", "source" => $request->stripeToken, "description" => "Invoice " . ($invoice->invoice_no)]);
+            $invoice->update(['status' => 'paid', 'paid_at' => now()]);
+            if($invoice->quote_id) { Quote::where('id', $invoice->quote_id)->update(['status' => 'paid']); }
+            Mail::raw("Payment received for Invoice #{$invoice->invoice_no}.", function($m) use ($company) {
+                $m->to($company->email)->subject('Payment Received');
+            });
+            return back()->with('success', 'Payment successful!');
+        } catch (\Exception $e) { return back()->with('error', $e->getMessage()); }
+    }
+
+    public function publicView($invoice_no) { 
+        $invoice = Invoice::where('invoice_no', $invoice_no)->firstOrFail(); 
+        return view('invoices.show', compact('invoice')); 
+    }
+
+    // 🔥 STRIPE CHECKOUT SESSION (APPEND ONLY)
+    public function stripeCheckout($invoice_no)
+    {
+        $invoice = \App\Models\Invoice::where('invoice_no', $invoice_no)
+            ->with('company')
+            ->firstOrFail();
+
+        $company = $invoice->company;
+
+        $isTest = ($company->stripe_mode ?? 'test') === 'test';
+
+        \Stripe\Stripe::setApiKey(
+            $isTest
+            ? $company->stripe_test_secret_key
+            : $company->stripe_secret_key
+        );
+
+        try {
+
+            $session = \Stripe\Checkout\Session::create([
+                'payment_method_types' => ['card'],
+                'mode' => 'payment',
+
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'product_data' => [
+                            'name' => 'Invoice #' . $invoice->invoice_no,
+                        ],
+                        'unit_amount' => intval($invoice->total * 100),
+                    ],
+                    'quantity' => 1,
+                ]],
+
+                'success_url' => url('/invoice/success/' . $invoice->invoice_no),
+                'cancel_url' => url('/invoice/pay/' . $invoice->invoice_no),
+
+            ]);
+
+            return redirect($session->url);
+
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+}

@@ -1,0 +1,186 @@
+@php
+    $hideSidebar = true;
+@endphp
+
+@extends('layouts.app')
+
+@php
+    $customer = \App\Models\Customer::find($quote->customer_id ?? null);
+
+    $items = is_array($quote->items)
+        ? $quote->items
+        : json_decode($quote->items ?? '[]', true) ?? [];
+@endphp
+
+@push('page_styles')
+<style>
+.mb-shell {
+    max-width:1100px;
+    margin:auto;
+    background:linear-gradient(180deg,rgba(2,6,23,.96),rgba(6,18,42,.96));
+    border:1px solid rgba(56,189,248,.18);
+    border-radius:28px;
+    padding:40px;
+    color:white;
+}
+
+.mb-layout {
+    display:grid;
+    grid-template-columns:2fr 1.2fr;
+    gap:24px;
+}
+
+.mb-card {
+    background:rgba(15,23,42,.62);
+    border-radius:22px;
+    padding:24px;
+}
+
+.mb-summary-card {
+    background:rgba(30,41,59,.4);
+    border-radius:22px;
+    padding:30px;
+    text-align:center;
+}
+
+.mb-title {
+    color:#7dd3fc;
+    font-size:11px;
+    font-weight:800;
+}
+
+.mb-total {
+    font-size:44px;
+    font-weight:900;
+    color:#38bdf8;
+}
+
+.mb-items-head, .mb-items-row {
+    display:grid;
+    grid-template-columns:2fr .5fr 1fr 1fr;
+    padding:12px 0;
+}
+
+.mb-items-head {
+    color:#94a3b8;
+    font-weight:800;
+    border-bottom:1px solid rgba(255,255,255,.1);
+}
+
+.mb-items-row {
+    border-bottom:1px solid rgba(255,255,255,.05);
+}
+
+.mb-btn {
+    padding:10px 16px;
+    border-radius:12px;
+    font-weight:800;
+    border:none;
+    color:white;
+}
+
+.mb-blue { background:#0ea5e9; }
+.mb-purple { background:#4f46e5; }
+.mb-dark { background:#334155; }
+.mb-green { background:#14b8a6; }
+
+.mb-approve-btn {
+    width:100%;
+    padding:18px;
+    border-radius:14px;
+    font-weight:900;
+    background:#3b82f6;
+    color:white;
+    text-align:center;
+    display:block;
+}
+
+.mb-thanks {
+    margin-top:20px;
+    padding:25px;
+    text-align:center;
+    border:1px dashed rgba(56,189,248,.3);
+    border-radius:20px;
+}
+</style>
+@endpush
+
+@section('content')
+
+<div class="mb-shell">
+
+    <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
+        <div>
+            <a href="{{ route('quotes.index') }}" style="color:white;">← Back</a>
+            <a href="{{ route('quotes.edit',$quote->id) }}" style="color:white;margin-left:10px;">Edit</a>
+        </div>
+
+        <div style="display:flex;gap:10px;">
+            <button class="mb-btn mb-blue">Send Quote</button>
+            <button class="mb-btn mb-purple">PDF</button>
+            <button class="mb-btn mb-dark">Copy</button>
+            <button class="mb-btn mb-green">SMS</button>
+        </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;margin-bottom:30px;">
+        <div>
+            <div class="mb-title">PROFESSIONAL QUOTE</div>
+            <h1>Quote #{{ $quote->quote_number }}</h1>
+        </div>
+
+        <div>
+            <h3>{{ auth()->user()->company->name ?? '' }}</h3>
+        </div>
+    </div>
+
+    <div class="mb-layout">
+
+        <div>
+
+            <div class="mb-card">
+                <strong>Client</strong>
+                <div>{{ $customer->name ?? 'Customer' }}</div>
+            </div>
+
+            <div class="mb-card">
+                <strong>Services & Items</strong>
+
+                <div class="mb-items-head">
+                    <div>Description</div>
+                    <div>Qty</div>
+                    <div>Price</div>
+                    <div>Total</div>
+                </div>
+
+                @foreach($items as $item)
+                    @php
+                        $q=(float)($item['qty']??0);
+                        $p=(float)($item['price']??0);
+                    @endphp
+
+                    <div class="mb-items-row">
+                        <div>{{ $item['service'] ?? '' }}</div>
+                        <div>{{ $q }}</div>
+                        <div>${{ $p }}</div>
+                        <div>${{ $q*$p }}</div>
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="mb-thanks">
+                Thank you for choosing {{ auth()->user()->company->name ?? '' }}.
+            </div>
+
+            @include('quotes.partials.messaging')
+@include('quotes.partials.test-email')
+
+        </div>
+
+        @include('quotes.partials.right')
+
+    </div>
+
+</div>
+
+@endsection

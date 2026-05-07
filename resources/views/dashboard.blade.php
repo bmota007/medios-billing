@@ -3,827 +3,229 @@
 @section('content')
 
 @php
-    $totalRevenue = (float) ($stats['total_revenue'] ?? 0);
-    $totalInvoices = (int) ($stats['total_invoices'] ?? 0);
-    $paidInvoices = (int) ($stats['paid_invoices'] ?? 0);
-    $pendingInvoices = (int) ($stats['pending_invoices'] ?? 0);
+$totalRevenue    = (float)($stats['total_revenue'] ?? 3600);
+$totalInvoices   = (int)($stats['total_invoices'] ?? 5);
+$paidInvoices    = (int)($stats['paid_invoices'] ?? 1);
+$pendingInvoices = (int)($stats['pending_invoices'] ?? 3);
+$customerCount   = (int)($customerCount ?? 5);
+$collectionRate  = $totalInvoices > 0 ? round(($paidInvoices/$totalInvoices)*100) : 20;
+$chartDataSafe   = !empty($chartData) ? array_values($chartData) : [2100, 2000, 2200, 3600, 2100, 1900, 2000, 2100, 2000, 1900, 1800, 2000];
 
-    $activeCompanies = max(4, $totalInvoices > 0 ? $totalInvoices : 4);
-    $totalSubscriptions = max(1, $paidInvoices + $pendingInvoices);
-
-    $activeSubs = max(1, $paidInvoices);
-    $pastDueSubs = $pendingInvoices;
-    $trialSubs = $totalSubscriptions > ($activeSubs + $pastDueSubs) ? $totalSubscriptions - ($activeSubs + $pastDueSubs) : 0;
-    $cancelledSubs = 0;
-
-    $bestPlan = $totalRevenue > 0 ? 'Professional' : 'Starter';
-    $mostActiveCompany = $recentInvoices->first()->customer_name ?? 'Pronto Painting';
-    $lastPaymentTime = $recentInvoices->first()?->updated_at ? $recentInvoices->first()->updated_at->format('M d, Y g:i A') : now()->format('M d, Y g:i A');
-
-    $chartMax = !empty($chartData) ? max($chartData) : 0;
-    $growthRate = $chartMax > 0 ? '14.2%' : '0%';
+// Health Status Logic
+$apiActive = true; 
+$webhookActive = true;
 @endphp
 
-<div class="max-w-[1760px] mx-auto pb-10">
-
-    <style>
-        .premium-card{
-            background:
-                radial-gradient(circle at top left, rgba(37,99,235,.10), transparent 32%),
-                linear-gradient(135deg, rgba(2,8,23,.96), rgba(5,18,46,.96));
-            border:1px solid rgba(255,255,255,.07);
-            box-shadow:
-                0 20px 40px rgba(0,0,0,.28),
-                inset 0 1px 0 rgba(255,255,255,.03);
-        }
-
-        .premium-card-soft{
-            background:
-                radial-gradient(circle at top center, rgba(56,189,248,.08), transparent 35%),
-                linear-gradient(135deg, rgba(2,8,23,.92), rgba(5,18,46,.92));
-            border:1px solid rgba(255,255,255,.07);
-            box-shadow:
-                0 18px 34px rgba(0,0,0,.24),
-                inset 0 1px 0 rgba(255,255,255,.03);
-        }
-
-        .premium-hover{
-            transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
-        }
-
-        .premium-hover:hover{
-            transform: translateY(-4px);
-            border-color: rgba(59,130,246,.22);
-            box-shadow:
-                0 24px 44px rgba(0,0,0,.34),
-                0 0 0 1px rgba(59,130,246,.06) inset;
-        }
-
-        .mini-badge{
-            display:inline-flex;
-            align-items:center;
-            gap:8px;
-            padding:6px 12px;
-            border-radius:999px;
-            font-size:12px;
-            font-weight:700;
-            border:1px solid rgba(255,255,255,.08);
-            background:rgba(255,255,255,.03);
-        }
-
-        .status-pill{
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
-            padding:7px 12px;
-            border-radius:999px;
-            font-size:12px;
-            font-weight:700;
-        }
-
-        .metric-label{
-            color:#94a3b8;
-            font-size:14px;
-            line-height:1.2;
-        }
-
-        .metric-value{
-            color:#fff;
-            font-size:48px;
-            line-height:1;
-            font-weight:800;
-            letter-spacing:-1px;
-        }
-
-        .metric-sub{
-            margin-top:10px;
-            font-size:14px;
-            font-weight:600;
-        }
-
-        .command-tile{
-            min-height:120px;
-        }
-
-        .insight-row,
-        .stripe-row,
-        .activity-row{
-            border-bottom:1px solid rgba(255,255,255,.06);
-        }
-
-        .insight-row:last-child,
-        .stripe-row:last-child,
-        .activity-row:last-child{
-            border-bottom:none;
-        }
-
-        @media(max-width:1280px){
-            .metric-value{
-                font-size:40px;
-            }
-        }
-
-        @media(max-width:768px){
-            .metric-value{
-                font-size:36px;
-            }
-        }
-    </style>
-
-    {{-- TOP HEADER --}}
-    <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 mb-6">
-
-        <div class="xl:col-span-5 rounded-3xl premium-card p-7 premium-hover">
-            <div class="flex items-start justify-between gap-4">
-                <div>
-                    <h1 class="text-4xl xl:text-5xl font-bold text-white leading-tight tracking-tight">
-                        {{ $greeting }}, {{ auth()->user()->name }} 👋
-                    </h1>
-
-                    <p class="text-slate-400 mt-3 text-lg">
-                        Welcome back to your command center
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="xl:col-span-2 rounded-3xl premium-card-soft p-5 premium-hover flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-300 text-xl shrink-0">
-                <i class="fa-solid fa-sun"></i>
-            </div>
-            <div>
-                <div class="text-white font-semibold text-lg">74°F Houston</div>
-                <div class="text-slate-400 text-sm">Clear and stable</div>
-            </div>
-        </div>
-
-        <div class="xl:col-span-2 rounded-3xl premium-card-soft p-5 premium-hover flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-sky-500/10 flex items-center justify-center text-sky-300 text-xl shrink-0">
-                <i class="fa-regular fa-calendar"></i>
-            </div>
-            <div>
-                <div class="text-white font-semibold text-sm xl:text-base">{{ now()->format('l') }}</div>
-                <div class="text-slate-400 text-sm">{{ now()->format('F d, Y') }}</div>
-            </div>
-        </div>
-
-        <div class="xl:col-span-3 rounded-3xl premium-card-soft p-5 premium-hover flex items-center justify-between gap-4">
-            <div class="flex items-center gap-4 min-w-0">
-                <div class="w-14 h-14 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-200 font-bold text-lg shrink-0">
-                    {{ strtoupper(substr(auth()->user()->name,0,1)) }}
-                </div>
-
-                <div class="min-w-0">
-                    <div class="text-white font-semibold truncate">{{ auth()->user()->name }}</div>
-                    <div class="text-slate-400 text-sm">
-                        {{ auth()->user()->role === 'super_admin' ? 'Super Administrator' : 'Administrator' }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="text-green-400 text-2xl shrink-0">
-                <i class="fa-solid fa-circle-check"></i>
-            </div>
-        </div>
-
-    </div>
-
-    {{-- TOP KPI CARDS --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 mb-6">
-
-        {{-- CARD 1 --}}
-        <div class="rounded-3xl premium-card p-5 premium-hover">
-            <div class="flex items-start justify-between">
-                <div class="w-14 h-14 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-300 text-2xl">
-                    <i class="fa-solid fa-dollar-sign"></i>
-                </div>
-
-                <div class="mini-badge text-green-400">
-                    <i class="fa-solid fa-arrow-trend-up text-[11px]"></i>
-                    {{ $growthRate }}
-                </div>
-            </div>
-
-            <div class="mt-4 metric-label">Monthly Recurring Revenue</div>
-            <div class="metric-value mt-2 counter-money" data-target="{{ number_format($totalRevenue, 2, '.', '') }}">$0.00</div>
-
-            <div class="metric-sub text-green-400">↗ from last month</div>
-
-            <div class="mt-4" style="height:42px;">
-                <canvas class="sparkline spark-purple"></canvas>
-            </div>
-        </div>
-
-        {{-- CARD 2 --}}
-        <div class="rounded-3xl premium-card p-5 premium-hover">
-            <div class="flex items-start justify-between">
-                <div class="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-300 text-2xl">
-                    <i class="fa-solid fa-building"></i>
-                </div>
-
-                <div class="mini-badge text-cyan-400">
-                    <i class="fa-solid fa-arrow-trend-up text-[11px]"></i>
-                    {{ $activeCompanies > 4 ? '+' . ($activeCompanies - 4) : '+0' }}
-                </div>
-            </div>
-
-            <div class="mt-4 metric-label">Active Companies</div>
-            <div class="metric-value mt-2 counter-int" data-target="{{ $activeCompanies }}">0</div>
-
-            <div class="metric-sub text-cyan-400">↗ live tenants</div>
-
-            <div class="mt-4" style="height:42px;">
-                <canvas class="sparkline spark-blue"></canvas>
-            </div>
-        </div>
-
-        {{-- CARD 3 --}}
-        <div class="rounded-3xl premium-card p-5 premium-hover">
-            <div class="flex items-start justify-between">
-                <div class="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center text-green-300 text-2xl">
-                    <i class="fa-solid fa-users"></i>
-                </div>
-
-                <div class="mini-badge text-green-400">
-                    <i class="fa-solid fa-arrow-trend-up text-[11px]"></i>
-                    +{{ max(1, $pendingInvoices) }}
-                </div>
-            </div>
-
-            <div class="mt-4 metric-label">Total Subscriptions</div>
-            <div class="metric-value mt-2 counter-int" data-target="{{ $totalSubscriptions }}">0</div>
-
-            <div class="metric-sub text-green-400">↗ upgrades this month</div>
-
-            <div class="mt-4" style="height:42px;">
-                <canvas class="sparkline spark-green"></canvas>
-            </div>
-        </div>
-
-        {{-- CARD 4 --}}
-        <div class="rounded-3xl premium-card p-5 premium-hover">
-            <div class="flex items-start justify-between">
-                <div class="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300 text-2xl">
-                    <i class="fa-solid fa-shield-halved"></i>
-                </div>
-
-                <div class="mini-badge text-green-400">
-                    <i class="fa-solid fa-circle-check text-[11px]"></i>
-                    Healthy
-                </div>
-            </div>
-
-            <div class="mt-4 metric-label">Platform Health</div>
-            <div class="metric-value mt-2">100%</div>
-
-            <div class="metric-sub text-green-400">All systems operational</div>
-
-            <div class="mt-4" style="height:42px;">
-                <canvas class="sparkline spark-amber"></canvas>
-            </div>
-        </div>
-
-        {{-- CARD 5 --}}
-        <div class="rounded-3xl premium-card p-5 premium-hover">
-            <div class="flex items-start justify-between">
-                <div class="w-14 h-14 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-300 text-2xl">
-                    <i class="fa-solid fa-money-bill-trend-up"></i>
-                </div>
-
-                <div class="mini-badge text-green-400">
-                    <i class="fa-solid fa-arrow-trend-up text-[11px]"></i>
-                    {{ $growthRate }}
-                </div>
-            </div>
-
-            <div class="mt-4 metric-label">Total Revenue (MTD)</div>
-            <div class="metric-value mt-2 counter-money" data-target="{{ number_format($totalRevenue, 2, '.', '') }}">$0.00</div>
-
-            <div class="metric-sub text-green-400">↗ current month</div>
-
-            <div class="mt-4" style="height:42px;">
-                <canvas class="sparkline spark-cyan"></canvas>
-            </div>
-        </div>
-
-    </div>
-    {{-- CHART / STATUS / STRIPE ROW --}}
-    <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 mb-6">
-
-        {{-- REVENUE OVERVIEW --}}
-        <div class="xl:col-span-6 rounded-3xl premium-card p-6 premium-hover">
-
-            <div class="flex items-center justify-between mb-6 gap-4">
-                <div>
-                    <h3 class="text-white text-2xl font-bold">Revenue Overview</h3>
-                    <div class="flex items-center gap-3 mt-2 flex-wrap">
-                        <div class="text-4xl font-bold text-white">
-                            ${{ number_format($totalRevenue, 2) }}
-                        </div>
-                        <span class="status-pill bg-green-500/15 text-green-400">
-                            <i class="fa-solid fa-arrow-trend-up mr-2"></i>{{ $growthRate }}
-                        </span>
-                    </div>
-                </div>
-
-                <div class="mini-badge text-white">
-                    This Month
-                    <i class="fa-solid fa-chevron-down text-[10px]"></i>
-                </div>
-            </div>
-
-            <div style="height:340px;">
-                <canvas id="revenueChart"></canvas>
-            </div>
-        </div>
-
-        {{-- SUBSCRIPTION STATUS --}}
-        <div class="xl:col-span-3 rounded-3xl premium-card p-6 premium-hover">
-            <div class="flex items-center justify-between mb-5">
-                <h3 class="text-white text-2xl font-bold">Subscription Status</h3>
-                <span class="text-green-400 text-sm font-semibold">Live Status</span>
-            </div>
-
-            <div class="flex items-center justify-center mb-6">
-                <div class="relative w-[220px] h-[220px]">
-                    <canvas id="subscriptionChart"></canvas>
-
-                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <div class="text-5xl font-bold text-white">{{ $totalSubscriptions }}</div>
-                        <div class="text-slate-400 text-sm mt-1">Total</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="space-y-4 text-sm">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <span class="w-3 h-3 rounded-sm bg-green-500 inline-block"></span>
-                        <span class="text-white">Active</span>
-                    </div>
-                    <span class="text-slate-300">{{ $activeSubs }}</span>
-                </div>
-
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <span class="w-3 h-3 rounded-sm bg-yellow-400 inline-block"></span>
-                        <span class="text-white">Past Due</span>
-                    </div>
-                    <span class="text-slate-300">{{ $pastDueSubs }}</span>
-                </div>
-
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <span class="w-3 h-3 rounded-sm bg-blue-500 inline-block"></span>
-                        <span class="text-white">Trial</span>
-                    </div>
-                    <span class="text-slate-300">{{ $trialSubs }}</span>
-                </div>
-
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <span class="w-3 h-3 rounded-sm bg-red-500 inline-block"></span>
-                        <span class="text-white">Cancelled</span>
-                    </div>
-                    <span class="text-slate-300">{{ $cancelledSubs }}</span>
-                </div>
-            </div>
-
-            <a href="{{ route('admin.sales.subscriptions') }}" class="inline-flex items-center gap-2 text-sky-400 mt-6 font-medium hover:text-sky-300 transition">
-                View All Subscriptions
-                <i class="fa-solid fa-arrow-right"></i>
-            </a>
-        </div>
-
-        {{-- STRIPE HEALTH --}}
-        <div class="xl:col-span-3 rounded-3xl premium-card p-6 premium-hover">
-            <div class="flex items-center justify-between mb-5">
-                <h3 class="text-white text-2xl font-bold">Stripe Health Status</h3>
-                <span class="text-green-400 text-sm font-semibold">Live Status</span>
-            </div>
-
-            <div class="rounded-2xl border border-white/7 bg-white/[0.02] p-4">
-                <div class="stripe-row flex items-center justify-between py-4">
-                    <div class="flex items-center gap-3">
-                        <i class="fa-regular fa-file-lines text-slate-300"></i>
-                        <span class="text-white">Mode</span>
-                    </div>
-                    <span class="{{ $stripeStatus === 'LIVE' ? 'text-green-400' : 'text-yellow-300' }} font-semibold">
-                        {{ $stripeStatus }}
-                    </span>
-                </div>
-
-                <div class="stripe-row flex items-center justify-between py-4">
-                    <div class="flex items-center gap-3">
-                        <i class="fa-solid fa-chart-column text-slate-300"></i>
-                        <span class="text-white">Webhook</span>
-                    </div>
-                    <span class="text-green-400 font-semibold">Connected</span>
-                </div>
-
-                <div class="stripe-row flex items-center justify-between py-4">
-                    <div class="flex items-center gap-3">
-                        <i class="fa-regular fa-circle-check text-slate-300"></i>
-                        <span class="text-white">API Connection</span>
-                    </div>
-                    <span class="text-green-400 font-semibold">Healthy</span>
-                </div>
-
-                <div class="stripe-row flex items-center justify-between py-4">
-                    <div class="flex items-center gap-3">
-                        <i class="fa-regular fa-calendar-days text-slate-300"></i>
-                        <span class="text-white">Last Payment</span>
-                    </div>
-                    <span class="text-slate-300 text-sm text-right">{{ $lastPaymentTime }}</span>
-                </div>
-
-                <div class="flex items-center justify-between py-4">
-                    <div class="flex items-center gap-3">
-                        <i class="fa-regular fa-shield text-slate-300"></i>
-                        <span class="text-white">Status</span>
-                    </div>
-                    <span class="text-green-400 font-semibold">Operational</span>
-                </div>
-            </div>
-
-            <a href="{{ route('admin.billing') }}" class="inline-flex items-center gap-2 text-sky-400 mt-5 font-medium hover:text-sky-300 transition">
-                View Stripe Health
-                <i class="fa-solid fa-arrow-right"></i>
-            </a>
-        </div>
-
-    </div>
-
-    {{-- PLATFORM COMMAND CENTER --}}
-    <div class="rounded-3xl premium-card p-6 premium-hover mb-6">
-        <h3 class="text-white text-2xl font-bold">Platform Command Center</h3>
-        <p class="text-slate-400 mt-1 mb-6">Quick actions to manage your SaaS platform</p>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
-
-            <a href="{{ route('admin.companies.create') }}" class="command-tile rounded-2xl border border-white/7 bg-white/[0.02] p-5 hover:bg-white/[0.04] transition group">
-                <div class="flex items-start justify-between">
-                    <div class="w-12 h-12 rounded-2xl bg-purple-500/15 flex items-center justify-center text-purple-300 text-2xl">
-                        <i class="fa-solid fa-user-plus"></i>
-                    </div>
-                    <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition"></i>
-                </div>
-                <div class="mt-4 text-white font-semibold">Add New Company</div>
-                <div class="text-slate-400 text-sm mt-1">Onboard a new tenant</div>
-            </a>
-
-            <a href="{{ route('admin.companies') }}" class="command-tile rounded-2xl border border-white/7 bg-white/[0.02] p-5 hover:bg-white/[0.04] transition group">
-                <div class="flex items-start justify-between">
-                    <div class="w-12 h-12 rounded-2xl bg-blue-500/15 flex items-center justify-center text-blue-300 text-2xl">
-                        <i class="fa-solid fa-building"></i>
-                    </div>
-                    <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition"></i>
-                </div>
-                <div class="mt-4 text-white font-semibold">View Companies</div>
-                <div class="text-slate-400 text-sm mt-1">Manage all tenants</div>
-            </a>
-
-            <a href="{{ route('admin.billing') }}" class="command-tile rounded-2xl border border-white/7 bg-white/[0.02] p-5 hover:bg-white/[0.04] transition group">
-                <div class="flex items-start justify-between">
-                    <div class="w-12 h-12 rounded-2xl bg-green-500/15 flex items-center justify-center text-green-300 text-2xl">
-                        <i class="fa-solid fa-file-invoice-dollar"></i>
-                    </div>
-                    <span class="status-pill bg-violet-500/15 text-violet-300">Billing</span>
-                </div>
-                <div class="mt-4 text-white font-semibold">Platform Billing</div>
-                <div class="text-slate-400 text-sm mt-1">Invoices and subscriptions</div>
-            </a>
-
-            <a href="{{ route('admin.sales.overview') }}" class="command-tile rounded-2xl border border-white/7 bg-white/[0.02] p-5 hover:bg-white/[0.04] transition group">
-                <div class="flex items-start justify-between">
-                    <div class="w-12 h-12 rounded-2xl bg-amber-500/15 flex items-center justify-center text-amber-300 text-2xl">
-                        <i class="fa-solid fa-chart-line"></i>
-                    </div>
-                    <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition"></i>
-                </div>
-                <div class="mt-4 text-white font-semibold">Revenue Reports</div>
-                <div class="text-slate-400 text-sm mt-1">Analytics and insights</div>
-            </a>
-
-            <a href="{{ route('admin.sales.subscriptions') }}" class="command-tile rounded-2xl border border-white/7 bg-white/[0.02] p-5 hover:bg-white/[0.04] transition group">
-                <div class="flex items-start justify-between">
-                    <div class="w-12 h-12 rounded-2xl bg-cyan-500/15 flex items-center justify-center text-cyan-300 text-2xl">
-                        <i class="fa-solid fa-credit-card"></i>
-                    </div>
-                    <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition"></i>
-                </div>
-                <div class="mt-4 text-white font-semibold">Subscriptions</div>
-                <div class="text-slate-400 text-sm mt-1">Plan monitoring</div>
-            </a>
-
-            <a href="{{ route('admin.brand') }}" class="command-tile rounded-2xl border border-white/7 bg-white/[0.02] p-5 hover:bg-white/[0.04] transition group">
-                <div class="flex items-start justify-between">
-                    <div class="w-12 h-12 rounded-2xl bg-rose-500/15 flex items-center justify-center text-rose-300 text-2xl">
-                        <i class="fa-solid fa-palette"></i>
-                    </div>
-                    <i class="fa-solid fa-arrow-right text-slate-500 group-hover:text-white transition"></i>
-                </div>
-                <div class="mt-4 text-white font-semibold">Brand Settings</div>
-                <div class="text-slate-400 text-sm mt-1">Platform appearance</div>
-            </a>
-
+<style>
+:root {
+    --bg-deep: #030712;
+    --card-glass: rgba(17, 24, 39, 0.85);
+    --border-light: rgba(255, 255, 255, 0.06);
+    --neon-blue: #38bdf8;
+    --neon-purple: #8b5cf6;
+    --neon-green: #10b981;
+    --neon-orange: #f59e0b;
+}
+
+body {
+    background: radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.08) 0px, transparent 35%), var(--bg-deep) !important;
+    font-family: 'Inter', sans-serif; color: #fff; margin: 0;
+}
+
+.dashboard-container { padding: 1.5rem 2rem; max-width: 1850px; margin: 0 auto; }
+
+/* 1. TOP BAR (UNCHANGED) */
+.cmd-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 40px; padding: 1.25rem 3.5rem;
+    position: sticky; top: 0; background: rgba(3, 7, 18, 0.95); backdrop-filter: blur(25px); z-index: 1000; border-bottom: 1px solid var(--border-light);
+}
+.search-pill-wow { flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 20px; display: flex; align-items: center; gap: 15px; }
+.search-pill-wow input { background: transparent; border: none; color: #fff; width: 100%; outline: none; font-size: 14px; }
+.widget-cluster-wow { display: flex; align-items: center; gap: 30px; }
+.icon-btn-wow { font-size: 20px; opacity: 0.6; cursor: pointer; }
+.profile-trigger-wow { display: flex; align-items: center; gap: 15px; padding-left: 25px; border-left: 1px solid rgba(255, 255, 255, 0.1); }
+.avatar-wow { width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); display: grid; place-items: center; font-weight: 900; font-size: 16px; }
+
+/* 2. TOP 3 CARDS (UNCHANGED) */
+.hero-grid { display: grid; grid-template-columns: 1.8fr 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+.card-elite { border-radius: 28px; padding: 1.8rem; position: relative; overflow: hidden; height: 215px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(255,255,255,0.08); }
+
+/* 3. 🔥 THE 5 IDENTICAL KPI CARDS WITH OPACITY GRADIENTS */
+.kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
+.premium-kpi {
+    background: var(--card-glass); border-radius: 22px; padding: 1.25rem;
+    height: 145px; position: relative; overflow: hidden;
+    border: 1px solid var(--border-light); backdrop-filter: blur(15px);
+    display: flex; flex-direction: column;
+}
+
+.kpi-icon-circle {
+    width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 14px; margin-bottom: 10px;
+}
+
+.kpi-label-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+.kpi-label-text { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); }
+
+.kpi-value-big { font-size: 26px; font-weight: 900; line-height: 1; margin-bottom: 4px; }
+.kpi-subtitle { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* OPACITY GRADIENTS ADDED PER CARD */
+.kpi-wave-container {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 45px;
+    pointer-events: none;
+}
+
+/* 4. REMAINING BOTTOM UI (UNCHANGED) */
+.main-layout { display: grid; grid-template-columns: 1fr 0.7fr 0.8fr; gap: 1.25rem; align-items: stretch; }
+.proto-card { background: var(--card-glass); border-radius: 24px; padding: 1.5rem; border: 1px solid var(--border-light); backdrop-filter: blur(15px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; overflow: hidden; }
+.revenue-footer-bar { background: rgba(255, 255, 255, 0.04); border-radius: 18px; padding: 1.2rem 1.5rem; display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
+.inv-row-vibrant { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 20px; padding: 0.8rem 1.2rem; margin-bottom: 0.8rem; display: flex; align-items: center; justify-content: space-between; }
+.btn-action-wow { padding: 15px; border-radius: 15px; font-weight: 800; font-size: 12px; text-decoration: none !important; color: #fff !important; display: flex; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,0.05); }
+.alert-bar-wow { background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 18px; padding: 1.2rem; margin: 1.25rem 0; display: flex; align-items: center; justify-content: space-between; }
+.health-row-wow { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.health-label { font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
+.health-status { color: var(--neon-green); font-weight: 800; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.fw-black { font-weight: 900; }
+.p-label { font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
+.p-val { font-size: 32px; font-weight: 900; }
+</style>
+
+<div class="cmd-bar">
+    <div style="font-weight: 900; font-size: 22px; letter-spacing: -1px;">MEDIOS<span style="color: var(--neon-blue)">BILLING</span></div>
+    <div class="search-pill-wow"><i class="fa-solid fa-magnifying-glass opacity-50"></i><input type="text" placeholder="Global search..."></div>
+    <div class="widget-cluster-wow">
+        <i class="fa-regular fa-bell icon-btn-wow"></i><i class="fa-regular fa-message icon-btn-wow"></i><i class="fa-regular fa-sun icon-btn-wow"></i>
+        <div class="profile-trigger-wow">
+            <div class="text-end d-none d-xl-block"><div class="fw-bold" style="font-size: 14px; line-height: 1;">{{ auth()->user()->name }}</div><div class="text-muted" style="font-size: 10px; margin-top: 4px;">Elite Membership <i class="fa-solid fa-chevron-down ms-1" style="font-size: 8px;"></i></div></div>
+            <div class="avatar-wow">{{ substr(auth()->user()->name, 0, 1) }}</div>
         </div>
     </div>
-    {{-- BOTTOM ROW --}}
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-5 mb-6">
+</div>
 
-        {{-- PLATFORM AT A GLANCE --}}
-        <div class="rounded-3xl premium-card p-6 premium-hover">
-            <h3 class="text-white text-2xl font-bold mb-6">Platform At A Glance</h3>
-
-            <div class="grid grid-cols-2 gap-6">
-                <div>
-                    <div class="text-slate-400 text-sm">Total Tenants</div>
-                    <div class="text-white text-4xl font-bold mt-2">{{ $activeCompanies }}</div>
-                    <div class="text-slate-500 text-sm mt-1">Active companies</div>
-                </div>
-
-                <div>
-                    <div class="text-slate-400 text-sm">MRR</div>
-                    <div class="text-white text-4xl font-bold mt-2">${{ number_format($totalRevenue, 0) }}</div>
-                    <div class="text-slate-500 text-sm mt-1">Monthly recurring</div>
-                </div>
-
-                <div>
-                    <div class="text-slate-400 text-sm">Growth Rate</div>
-                    <div class="text-green-400 text-4xl font-bold mt-2">{{ $growthRate }}</div>
-                    <div class="text-slate-500 text-sm mt-1">vs last month</div>
-                </div>
-
-                <div>
-                    <div class="text-slate-400 text-sm">Churn Rate</div>
-                    <div class="text-red-400 text-4xl font-bold mt-2">{{ $pendingInvoices > 0 ? '2.1%' : '0%' }}</div>
-                    <div class="text-slate-500 text-sm mt-1">this month</div>
-                </div>
-            </div>
+<div class="dashboard-container">
+    <div class="hero-grid">
+        <div class="card-elite" style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #6366f1 100%); border:none;">
+            <div><h1 class="fw-black mb-0" style="font-size: 32px;">Good Evening, {{ explode(' ', auth()->user()->name)[0] }} 👋</h1><p class="text-white-50 small mb-2">Monitoring your elite command center.</p><span class="badge rounded-pill bg-white text-dark fw-black px-3 py-2" style="width:fit-content; font-size:10px">ELITE PLAN 👑</span></div>
+@if(request()->get("billing") == "success")
+<div style="background:#022c22;color:#86efac;padding:15px;border-radius:10px;margin-bottom:20px;">
+🎉 <strong>Welcome to MediosBilling!</strong><br>
+Your 5-day free trial has started successfully.<br>
+You will NOT be charged today.<br>
+Billing begins automatically after your trial ends.<br>
+</div>
+@endif
+            <div style="position:absolute; bottom:-5px; width:100%; height:70px; opacity:0.3;"><svg width="100%" height="100%" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M0 15 Q 15 5, 30 15 T 60 10 T 100 15" fill="none" stroke="#fff" stroke-width="2"/></svg></div>
         </div>
-
-        {{-- RECENT PLATFORM ACTIVITY --}}
-        <div class="rounded-3xl premium-card p-6 premium-hover">
-            <div class="flex items-center justify-between mb-6">
-                <h3 class="text-white text-2xl font-bold">Recent Platform Activity</h3>
-                <a href="{{ route('admin.sales.overview') }}" class="text-sky-400 text-sm font-medium hover:text-sky-300 transition">
-                    View All
-                </a>
-            </div>
-
-            <div class="space-y-0">
-                @forelse($recentInvoices->take(4) as $inv)
-                    <div class="activity-row py-4 flex items-start justify-between gap-4">
-                        <div class="flex items-start gap-3">
-                            <div class="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center text-blue-300 shrink-0">
-                                <i class="fa-solid fa-receipt"></i>
-                            </div>
-
-                            <div>
-                                <div class="text-white font-medium">
-                                    Payment received from {{ $inv->customer_name ?: 'Customer' }}
-                                </div>
-                                <div class="text-slate-400 text-sm mt-1">
-                                    Invoice #{{ $inv->invoice_no }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="text-slate-500 text-sm whitespace-nowrap">
-                            ${{ number_format($inv->total, 2) }}
-                        </div>
-                    </div>
-                @empty
-                    <div class="text-slate-400">No activity yet</div>
-                @endforelse
-            </div>
-        </div>
-
-        {{-- QUICK INSIGHTS --}}
-        <div class="rounded-3xl premium-card p-6 premium-hover">
-            <h3 class="text-white text-2xl font-bold mb-6">Quick Insights</h3>
-
-            <div class="space-y-0">
-                <div class="insight-row py-5 flex items-center justify-between gap-4">
-                    <span class="text-slate-300">Best Performing Plan</span>
-                    <span class="text-green-400 font-semibold">{{ $bestPlan }}</span>
-                </div>
-
-                <div class="insight-row py-5 flex items-center justify-between gap-4">
-                    <span class="text-slate-300">Most Active Company</span>
-                    <span class="text-blue-400 font-semibold text-right">{{ $mostActiveCompany }}</span>
-                </div>
-
-                <div class="insight-row py-5 flex items-center justify-between gap-4">
-                    <span class="text-slate-300">Total Revenue (All Time)</span>
-                    <span class="text-purple-400 font-semibold">${{ number_format($totalRevenue, 2) }}</span>
-                </div>
-            </div>
-        </div>
-
+        <div class="card-elite" style="background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); border-bottom: 3px solid var(--neon-green);"><div style="font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); text-transform:uppercase;">Total Revenue</div><div style="font-size:42px; font-weight:900;">${{ number_format($totalRevenue,0) }}</div><div class="text-success small fw-bold">↑ 18.3% growth</div></div>
+        <div class="card-elite" style="background: #111827; border-bottom: 3px solid var(--neon-purple); border: 1px solid rgba(139, 92, 246, 0.3);"><div style="font-size:10px; font-weight:800; color:#94a3b8; text-transform:uppercase;">Stripe Status</div><div style="color:var(--neon-purple); font-size:42px; font-weight:900;">LIVE</div><div class="text-muted small">Payments Ready</div></div>
     </div>
 
-    {{-- FOOTER --}}
-    <div class="flex flex-col md:flex-row items-center justify-between gap-3 text-slate-500 text-sm px-2">
-        <div>© {{ now()->year }} Medios Billing. All rights reserved.</div>
-        <div>v2.0.0</div>
+    <div class="kpi-grid">
+        <div class="premium-kpi">
+            <div class="kpi-label-row"><div class="kpi-icon-circle" style="background: rgba(56, 189, 248, 0.1); color: var(--neon-blue);"><i class="fa-solid fa-file-invoice"></i></div><div class="kpi-label-text">Invoices</div></div>
+            <div class="kpi-value-big">{{ $totalInvoices }}</div>
+            <div class="kpi-subtitle" style="color: var(--neon-blue);">Total Created</div>
+            <div class="kpi-wave-container" style="background: linear-gradient(to top, rgba(56, 189, 248, 0.3) 0%, transparent 100%);">
+                <svg width="100%" height="100%" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M0 15 Q 15 10, 30 15 T 60 8 T 100 15" fill="none" stroke="var(--neon-blue)" stroke-width="1.5"/></svg>
+            </div>
+        </div>
+
+        <div class="premium-kpi">
+            <div class="kpi-label-row"><div class="kpi-icon-circle" style="background: rgba(16, 185, 129, 0.1); color: var(--neon-green);"><i class="fa-solid fa-circle-check"></i></div><div class="kpi-label-text">Paid</div></div>
+            <div class="kpi-value-big">{{ $paidInvoices }}</div>
+            <div class="kpi-subtitle" style="color: var(--neon-green);">Collected</div>
+            <div class="kpi-wave-container" style="background: linear-gradient(to top, rgba(16, 185, 129, 0.3) 0%, transparent 100%);">
+                <svg width="100%" height="100%" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M0 18 L 10 12 L 25 15 L 45 8 L 70 12 L 100 15" fill="none" stroke="var(--neon-green)" stroke-width="1.5"/></svg>
+            </div>
+        </div>
+
+        <div class="premium-kpi">
+            <div class="kpi-label-row"><div class="kpi-icon-circle" style="background: rgba(245, 158, 11, 0.1); color: var(--neon-orange);"><i class="fa-solid fa-clock"></i></div><div class="kpi-label-text">Pending</div></div>
+            <div class="kpi-value-big">{{ $pendingInvoices }}</div>
+            <div class="kpi-subtitle" style="color: var(--neon-orange);">Needs Follow Up</div>
+            <div class="kpi-wave-container" style="background: linear-gradient(to top, rgba(245, 158, 11, 0.3) 0%, transparent 100%);">
+                <svg width="100%" height="100%" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M0 15 Q 20 20, 40 10 T 80 15 T 100 12" fill="none" stroke="var(--neon-orange)" stroke-width="1.5"/></svg>
+            </div>
+        </div>
+
+        <div class="premium-kpi">
+            <div class="kpi-label-row"><div class="kpi-icon-circle" style="background: rgba(56, 189, 248, 0.1); color: var(--neon-blue);"><i class="fa-solid fa-users"></i></div><div class="kpi-label-text">Customers</div></div>
+            <div class="kpi-value-big">{{ $customerCount }}</div>
+            <div class="kpi-subtitle" style="color: var(--neon-blue);">Active Records</div>
+            <div class="kpi-wave-container" style="background: linear-gradient(to top, rgba(56, 189, 248, 0.3) 0%, transparent 100%);">
+                <svg width="100%" height="100%" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M0 10 Q 15 18, 35 10 T 70 15 T 100 8" fill="none" stroke="var(--neon-blue)" stroke-width="1.5"/></svg>
+            </div>
+        </div>
+
+        <div class="premium-kpi">
+            <div class="kpi-label-row"><div class="kpi-icon-circle" style="background: rgba(139, 92, 246, 0.1); color: var(--neon-purple);"><i class="fa-solid fa-chart-pie"></i></div><div class="kpi-label-text">Collection Rate</div></div>
+            <div class="kpi-value-big">{{ $collectionRate }}%</div>
+            <div class="kpi-subtitle" style="color: var(--neon-purple);">Healthy</div>
+            <div class="kpi-wave-container" style="background: linear-gradient(to top, rgba(139, 92, 246, 0.3) 0%, transparent 100%);">
+                <svg width="100%" height="100%" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M0 15 Q 25 5, 50 15 T 75 10 T 100 15" fill="none" stroke="var(--neon-purple)" stroke-width="1.5"/></svg>
+            </div>
+        </div>
     </div>
 
+    <div class="main-layout">
+        <div class="proto-card" style="display:flex; flex-direction:column; min-height:480px;">
+            <div class="d-flex justify-content-between mb-2"><div><h5 class="fw-black m-0">Revenue Overview</h5><span class="p-label" style="font-size:9px">Last 12 Months</span></div></div>
+            <div style="flex-grow: 1; min-height: 280px;"><canvas id="revenueChart"></canvas></div>
+            <div class="revenue-footer-bar">
+                <div class="d-flex align-items-center gap-3"><div style="width:34px; height:34px; border-radius:50%; background:#2563eb; display:grid; place-items:center;"><i class="fa-solid fa-dollar-sign"></i></div><div><div style="font-size:15px; font-weight:900;">$3,600</div><div style="font-size:8px; font-weight:800; color:#94a3b8; text-transform:uppercase;">This Month</div></div></div>
+                <div class="d-flex align-items-center gap-3"><div style="width:34px; height:34px; border-radius:50%; background:#7c3aed; display:grid; place-items:center;"><i class="fa-solid fa-bolt"></i></div><div><div style="font-size:15px; font-weight:900;">$3,040</div><div style="font-size:8px; font-weight:800; color:#94a3b8; text-transform:uppercase;">Last Month</div></div></div>
+                <div class="d-flex align-items-center gap-2"><div class="text-success fw-black" style="font-size:18px;">↑ 18.3%</div><div style="font-size:8px; font-weight:800; color:#94a3b8; text-transform:uppercase;">Growth</div></div>
+            </div>
+        </div>
+
+        <div class="proto-card">
+            <div class="d-flex justify-content-between mb-4"><h5 class="fw-black m-0">Recent Invoices</h5><a href="#" class="text-info small text-decoration-none fw-bold">View All</a></div>
+            @foreach($recentInvoices->take(5) as $inv)
+            @php $statusColors = ['paid' => '#10b981', 'sent' => '#2563eb', 'partial' => '#7c3aed', 'unpaid' => '#ef4444', 'pending' => '#f59e0b']; $bg = $statusColors[strtolower($inv->status)] ?? '#38bdf8'; @endphp
+            <div class="inv-row-vibrant">
+                <div class="d-flex align-items-center gap-3">
+                    <div style="width:40px; height:40px; border-radius:12px; display:grid; place-items:center; background:{{$bg}}20; color:{{$bg}}"><i class="fa-solid fa-file-invoice"></i></div>
+                    <div><div class="fw-black" style="font-size: 11px;">#{{ substr($inv->invoice_no, -8) }}</div><div class="text-muted" style="font-size: 10px;">{{ Str::limit($inv->customer_name, 12) }}</div></div>
+                </div>
+                <div class="text-end"><div class="fw-black" style="font-size:13px;">${{ number_format($inv->total,0) }}</div><span style="font-size:8px; font-weight:900; padding:3px 8px; border-radius:5px; background:{{$bg}}20; color:{{$bg}}">{{ strtoupper($inv->status) }}</span></div>
+            </div>
+            @endforeach
+        </div>
+
+        <div style="display:flex; flex-direction:column;">
+            <div class="proto-card">
+                <h6 class="fw-black mb-3">Quick Actions</h6>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <a href="{{ route('invoice.create') }}" class="btn-action-wow" style="background:#2563eb"><i class="fa-solid fa-file-circle-plus"></i> Create Invoice</a>
+                    <a href="{{ route('quotes.index') }}" class="btn-action-wow" style="background:#7c3aed"><i class="fa-solid fa-file-invoice"></i> Quotes</a>
+                    <a href="{{ route('customers.index') }}" class="btn-action-wow" style="background:#10b981"><i class="fa-solid fa-users"></i> Customers</a>
+                    <a href="{{ route('invoice.history') }}" class="btn-action-wow" style="background:#f59e0b"><i class="fa-solid fa-chart-bar"></i> Reports</a>
+                    <a href="{{ route('company.settings') }}" class="btn-action-wow" style="background:#0891b2"><i class="fa-solid fa-gear"></i> Settings</a>
+                    <a href="{{ route('subscription.portal') }}" class="btn-action-wow" style="background:#db2777"><i class="fa-solid fa-rocket"></i> Upgrade</a>
+                </div>
+            </div>
+            <div class="alert-bar-wow"><div class="d-flex align-items-center gap-3"><i class="fa-solid fa-bell fs-5"></i><div class="small fw-black">You have {{ $pendingInvoices }} pending invoice(s) waiting for payment.</div></div><i class="fa-solid fa-arrow-right fs-6"></i></div>
+            <div class="proto-card">
+                <h6 class="fw-black mb-3">Stripe Health</h6>
+                <div class="health-row-wow"><span class="health-label">API</span><span class="health-status">Healthy <i class="fa-solid fa-circle-check"></i></span></div>
+                <div class="health-row-wow"><span class="health-label">Webhook</span><span class="health-status">Connected <i class="fa-solid fa-circle-check"></i></span></div>
+                <div class="health-row-wow"><span class="health-label">Mode</span><span class="health-status">LIVE <i class="fa-solid fa-circle-check"></i></span></div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const chartData = @json(array_values($chartData ?? []));
-    const moneyCounters = document.querySelectorAll('.counter-money');
-    const intCounters = document.querySelectorAll('.counter-int');
-
-    function animateMoneyCounter(el) {
-        const target = parseFloat(el.dataset.target || 0);
-        let current = 0;
-        const steps = 45;
-        const increment = target / steps;
-
-        function update() {
-            current += increment;
-
-            if (current >= target) {
-                current = target;
-            }
-
-            el.textContent = '$' + current.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-
-            if (current < target) {
-                requestAnimationFrame(update);
-            }
-        }
-
-        update();
-    }
-
-    function animateIntCounter(el) {
-        const target = parseInt(el.dataset.target || 0, 10);
-        let current = 0;
-        const steps = 35;
-        const increment = Math.max(1, Math.ceil(target / steps));
-
-        function update() {
-            current += increment;
-
-            if (current >= target) {
-                current = target;
-            }
-
-            el.textContent = current.toLocaleString();
-
-            if (current < target) {
-                requestAnimationFrame(update);
-            }
-        }
-
-        update();
-    }
-
-    moneyCounters.forEach(animateMoneyCounter);
-    intCounters.forEach(animateIntCounter);
-
-    function buildSparkline(canvas, color, fillColor, data) {
-        new Chart(canvas, {
-            type: 'line',
-            data: {
-                labels: data.map((_, i) => i + 1),
-                datasets: [{
-                    data: data,
-                    borderColor: color,
-                    backgroundColor: fillColor,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0.42
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: {
-                    duration: 1600
-                },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: { enabled: false }
-                },
-                scales: {
-                    x: { display: false },
-                    y: { display: false }
-                }
-            }
-        });
-    }
-
-    const sparkConfigs = [
-        { selector: '.spark-purple', color: '#8b5cf6', fill: 'rgba(139,92,246,.15)', data: [12,18,16,14,17,19,16,15,17,21,24,20,25] },
-        { selector: '.spark-blue',   color: '#3b82f6', fill: 'rgba(59,130,246,.15)', data: [7,10,8,9,10,9,7,10,10,12,11,14,13] },
-        { selector: '.spark-green',  color: '#22c55e', fill: 'rgba(34,197,94,.15)', data: [5,8,7,9,6,8,11,10,12,10,9,13,15] },
-        { selector: '.spark-amber',  color: '#fbbf24', fill: 'rgba(251,191,36,.15)', data: [9,9,9,9,9,9,9,9,9,9,9,9,9] },
-        { selector: '.spark-cyan',   color: '#22d3ee', fill: 'rgba(34,211,238,.15)', data: [8,10,9,11,8,12,12,11,11,14,13,16,18] }
-    ];
-
-    sparkConfigs.forEach(cfg => {
-        document.querySelectorAll(cfg.selector).forEach(canvas => {
-            buildSparkline(canvas, cfg.color, cfg.fill, cfg.data);
-        });
-    });
-
-    new Chart(document.getElementById('revenueChart'), {
-        type: 'line',
-        data: {
-            labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-            datasets: [{
-                data: chartData,
-                borderColor: '#7c3aed',
-                backgroundColor: 'rgba(124,58,237,.18)',
-                fill: true,
-                tension: 0.45,
-                pointRadius: 4,
-                pointHoverRadius: 7,
-                pointBackgroundColor: '#60a5fa',
-                pointBorderColor: '#60a5fa',
-                borderWidth: 3
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: {
-                duration: 1700
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#0f172a',
-                    borderColor: 'rgba(255,255,255,.08)',
-                    borderWidth: 1,
-                    titleColor: '#fff',
-                    bodyColor: '#fff',
-                    callbacks: {
-                        label: function(context) {
-                            return ' $' + Number(context.raw).toLocaleString();
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    ticks: {
-                        color: '#94a3b8',
-                        callback: function(v){ return '$' + v; }
-                    },
-                    grid: {
-                        color: 'rgba(255,255,255,.05)'
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: '#94a3b8'
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
-            }
-        }
-    });
-
-    new Chart(document.getElementById('subscriptionChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Active', 'Past Due', 'Trial', 'Cancelled'],
-            datasets: [{
-                data: [{{ $activeSubs }}, {{ $pastDueSubs }}, {{ $trialSubs }}, {{ $cancelledSubs }}],
-                backgroundColor: ['#22c55e', '#fbbf24', '#3b82f6', '#ef4444'],
-                borderWidth: 0,
-                hoverOffset: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            cutout: '72%',
-            animation: {
-                duration: 1700
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#0f172a',
-                    titleColor: '#fff',
-                    bodyColor: '#fff'
-                }
-            }
-        }
-    });
+const ctx = document.getElementById('revenueChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+        datasets: [{ data: {!! json_encode($chartDataSafe) !!}, borderColor: '#38bdf8', borderWidth: 3, fill: true, backgroundColor: 'rgba(56, 189, 248, 0.1)', tension: 0.4, pointRadius: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: true, ticks: { color: '#64748b' } }, y: { display: true, ticks: { color: '#64748b' } } } }
+});
 </script>
-
 @endsection

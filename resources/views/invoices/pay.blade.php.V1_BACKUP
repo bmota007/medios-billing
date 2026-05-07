@@ -1,0 +1,95 @@
+@extends('layouts.app')
+
+@section('content')
+<div style="max-width:600px;margin:50px auto;background:#fff;padding:30px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.1);">
+
+    <h2 style="margin-bottom:20px;">Pay Invoice #{{ $invoice->invoice_no }}</h2>
+
+    <p><strong>Customer:</strong> {{ $invoice->customer->name ?? '' }}</p>
+    <p><strong>Total:</strong> ${{ number_format($invoice->total,2) }}</p>
+
+<form action="{{ route('stripe.post', $invoice->id) }}" method="POST">
+    @csrf
+
+    <script
+        src="https://checkout.stripe.com/checkout.js"
+        class="stripe-button"
+        data-key="{{ $invoice->company->stripe_mode === 'test'
+            ? $invoice->company->stripe_test_publishable_key
+            : $invoice->company->stripe_publishable_key }}"
+        data-amount="{{ $invoice->total * 100 }}"
+        data-name="{{ $invoice->company->name }}"
+        data-description="Invoice {{ $invoice->invoice_no }}"
+        data-currency="usd"
+        data-email="{{ $invoice->customer_email ?? '' }}">
+    </script>
+</form>
+
+</div>
+@endsection
+
+<!-- 🔥 FIX: FORCE TEXT VISIBILITY + PAYMENT OPTIONS -->
+<style>
+.text-fix-white {
+    color: #ffffff !important;
+}
+.payment-box-fix {
+    background: #0b1a2b !important;
+    color: #ffffff !important;
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 20px;
+}
+.btn-pay {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    margin-top: 10px;
+    border-radius: 10px;
+    font-weight: bold;
+    text-align: center;
+    text-decoration: none;
+}
+.btn-venmo { background: #008CFF; color: white; }
+.btn-zelle { background: #6d1ed1; color: white; }
+.btn-whatsapp { background: #25D366; color: white; }
+</style>
+
+<div class="payment-box-fix">
+
+    <h3 class="text-fix-white">💳 Payment Options</h3>
+
+    <!-- STRIPE -->
+    <form action="{{ route('stripe.post', $invoice->id) }}" method="POST">
+        @csrf
+        <button type="submit" class="btn-pay" style="background:#4a90e2;color:white;">
+            Pay with Card (Stripe)
+        </button>
+    </form>
+
+    <!-- VENMO -->
+    @if($invoice->company->accept_venmo && $invoice->company->venmo_value)
+        <a href="https://venmo.com/{{ str_replace('@','',$invoice->company->venmo_value) }}?txn=pay&amount={{ $invoice->total }}"
+           target="_blank"
+           class="btn-pay btn-venmo">
+           Pay with Venmo
+        </a>
+    @endif
+
+    <!-- ZELLE -->
+    @if($invoice->company->accept_zelle && $invoice->company->zelle_value)
+        <div class="btn-pay btn-zelle">
+            Send via Zelle to:<br>
+            <strong>{{ $invoice->company->zelle_value }}</strong>
+        </div>
+    @endif
+
+    <!-- WHATSAPP -->
+    <a href="https://wa.me/1XXXXXXXXXX?text=I%20just%20paid%20Invoice%20{{ $invoice->invoice_no }}"
+       target="_blank"
+       class="btn-pay btn-whatsapp">
+       Confirm Payment via WhatsApp
+    </a>
+
+</div>
+

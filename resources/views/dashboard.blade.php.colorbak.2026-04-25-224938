@@ -1,0 +1,368 @@
+@extends('layouts.app')
+
+@section('content')
+
+@php
+$rawPlan = strtolower($company->plan_name ?? $company->plan ?? 'starter');
+$grandfathered = in_array($company->id ?? 0, [2,3,7]);
+$plan = $grandfathered ? 'elite' : $rawPlan;
+$planLabel = ucfirst($plan);
+
+$totalRevenue    = (float)($stats['total_revenue'] ?? 0);
+$totalInvoices   = (int)($stats['total_invoices'] ?? 0);
+$paidInvoices    = (int)($stats['paid_invoices'] ?? 0);
+$pendingInvoices = (int)($stats['pending_invoices'] ?? 0);
+$customerCount   = (int)($customerCount ?? 0);
+
+$chartDataSafe = !empty($chartData) ? array_values($chartData) : [0,0,0,0,0,0,0,0,0,0,0,0];
+
+$collectionRate = $totalInvoices > 0 ? round(($paidInvoices / $totalInvoices) * 100) : 0;
+$growthRate = $totalRevenue > 0 ? '+18.3%' : '0%';
+@endphp
+
+<style>
+body{
+background:
+radial-gradient(circle at top right, rgba(59,130,246,.18), transparent 22%),
+radial-gradient(circle at bottom left, rgba(99,102,241,.14), transparent 28%),
+#030712;
+color:#fff;
+font-family:Inter,Arial,sans-serif;
+}
+
+.v5-wrap{
+max-width:1780px;
+margin:auto;
+padding:18px 24px 30px;
+}
+
+.v5-topbar{
+display:grid;
+grid-template-columns:220px 1fr 340px;
+gap:18px;
+align-items:center;
+margin-bottom:18px;
+}
+
+.v5-logo{
+font-size:26px;
+font-weight:900;
+letter-spacing:.5px;
+}
+
+.v5-logo span{color:#38bdf8;}
+
+.v5-search{
+height:52px;
+border-radius:16px;
+border:1px solid rgba(255,255,255,.06);
+background:rgba(255,255,255,.03);
+padding:0 18px;
+display:flex;
+align-items:center;
+color:#94a3b8;
+}
+
+.v5-user{
+display:flex;
+justify-content:flex-end;
+gap:12px;
+align-items:center;
+}
+
+.v5-avatar{
+width:44px;height:44px;border-radius:50%;
+background:linear-gradient(135deg,#2563eb,#7c3aed);
+display:flex;align-items:center;justify-content:center;
+font-weight:800;
+}
+
+.v5-card{
+background:linear-gradient(180deg,#07152f,#081327);
+border:1px solid rgba(255,255,255,.06);
+border-radius:22px;
+padding:22px;
+box-shadow:0 20px 40px rgba(0,0,0,.32);
+}
+
+.v5-main{
+display:grid;
+grid-template-columns:2fr 1fr;
+gap:18px;
+margin-bottom:18px;
+}
+
+.v5-hero h1{
+font-size:42px;
+line-height:1.1;
+margin:0 0 8px;
+font-weight:900;
+}
+
+.v5-sub{
+color:#94a3b8;
+font-size:15px;
+}
+
+.v5-plan{
+display:inline-block;
+margin-top:16px;
+padding:8px 14px;
+border-radius:999px;
+background:linear-gradient(90deg,#2563eb,#7c3aed);
+font-size:12px;
+font-weight:800;
+}
+
+.v5-kpis{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:18px;
+margin-bottom:18px;
+}
+
+.v5-metric{
+font-size:46px;
+font-weight:900;
+line-height:1;
+margin:8px 0;
+}
+
+.v5-muted{color:#94a3b8;font-size:13px;}
+.v5-green{color:#22c55e;}
+.v5-blue{color:#38bdf8;}
+.v5-yellow{color:#facc15;}
+
+.v5-grid{
+display:grid;
+grid-template-columns:2fr 1fr 1fr;
+gap:18px;
+}
+
+.v5-chart{
+height:420px;
+}
+
+.v5-mini-list .row{
+display:flex;
+justify-content:space-between;
+padding:14px 0;
+border-bottom:1px solid rgba(255,255,255,.05);
+}
+
+.v5-mini-list .row:last-child{border-bottom:none;}
+
+.v5-actions{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px;
+margin-top:10px;
+}
+
+.v5-btn{
+display:block;
+padding:14px;
+border-radius:16px;
+text-decoration:none;
+color:#fff;
+background:rgba(255,255,255,.03);
+border:1px solid rgba(255,255,255,.05);
+font-size:14px;
+}
+
+.v5-btn:hover{
+background:rgba(37,99,235,.15);
+color:#fff;
+}
+
+.v5-alert{
+margin-top:14px;
+padding:14px;
+border-radius:16px;
+background:linear-gradient(135deg,#1d4ed8,#7c3aed);
+font-size:14px;
+}
+
+@media(max-width:1500px){
+.v5-grid{grid-template-columns:1fr;}
+.v5-main{grid-template-columns:1fr;}
+.v5-kpis{grid-template-columns:repeat(2,1fr);}
+.v5-topbar{grid-template-columns:1fr;}
+}
+
+@media(max-width:768px){
+.v5-kpis{grid-template-columns:1fr;}
+.v5-hero h1{font-size:30px;}
+.v5-metric{font-size:34px;}
+}
+</style>
+
+<div class="v5-wrap">
+
+<div class="v5-topbar">
+<div class="v5-logo">MEDIOS<span>BILLING</span></div>
+
+<div class="v5-search">🔍 Search anything...</div>
+
+<div class="v5-user">
+<div class="v5-muted">{{ now()->format('l, F j, Y') }}</div>
+<div class="v5-avatar">{{ strtoupper(substr(auth()->user()->name,0,1)) }}</div>
+</div>
+</div>
+
+<div class="v5-main">
+
+<div class="v5-card v5-hero">
+<h1>{{ $greeting }}, {{ auth()->user()->name }} 👋</h1>
+<div class="v5-sub">Here's what's happening with your business today.</div>
+<div class="v5-plan">{{ strtoupper($planLabel) }} PLAN</div>
+</div>
+
+<div class="v5-card">
+<div class="v5-muted">Total Revenue</div>
+<div class="v5-metric">${{ number_format($totalRevenue,0) }}</div>
+<div class="v5-green">{{ $growthRate }} from last month</div>
+</div>
+
+<div class="v5-card">
+<div class="v5-muted">Stripe Status</div>
+<div class="v5-metric" style="font-size:34px;">{{ $stripeStatus }}</div>
+<div class="v5-muted">Payments Ready</div>
+</div>
+
+</div>
+
+<div class="v5-kpis">
+
+<div class="v5-card">
+<div class="v5-muted">Invoices</div>
+<div class="v5-metric">{{ $totalInvoices }}</div>
+<div class="v5-blue">Total Created</div>
+</div>
+
+<div class="v5-card">
+<div class="v5-muted">Paid</div>
+<div class="v5-metric">{{ $paidInvoices }}</div>
+<div class="v5-green">Collected</div>
+</div>
+
+<div class="v5-card">
+<div class="v5-muted">Pending</div>
+<div class="v5-metric">{{ $pendingInvoices }}</div>
+<div class="v5-yellow">Needs Follow Up</div>
+</div>
+
+<div class="v5-card">
+<div class="v5-muted">Customers</div>
+<div class="v5-metric">{{ $customerCount }}</div>
+<div class="v5-blue">Active Records</div>
+</div>
+
+<div class="v5-card">
+<div class="v5-muted">Collection Rate</div>
+<div class="v5-metric">{{ $collectionRate }}%</div>
+<div class="v5-green">Healthy</div>
+</div>
+
+</div>
+
+<div class="v5-grid">
+
+<div class="v5-card">
+<div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+<div>
+<div style="font-size:26px;font-weight:900;">Revenue Overview</div>
+<div class="v5-muted">Last 12 Months</div>
+</div>
+<div class="v5-muted">This Month</div>
+</div>
+
+<div class="v5-chart">
+<canvas id="revenueChart"></canvas>
+</div>
+</div>
+
+<div class="v5-card">
+<div style="font-size:24px;font-weight:900;margin-bottom:10px;">Recent Invoices</div>
+
+<div class="v5-mini-list">
+@forelse($recentInvoices as $invoice)
+<div class="row">
+<div>
+<div style="font-weight:800;">#{{ $invoice->invoice_no ?? $invoice->id }}</div>
+<div class="v5-muted">{{ $invoice->customer_name }}</div>
+</div>
+<div style="text-align:right;">
+<div style="font-weight:800;">${{ number_format($invoice->total,2) }}</div>
+<div class="v5-muted">{{ strtoupper($invoice->status) }}</div>
+</div>
+</div>
+@empty
+<div class="v5-muted">No invoices found.</div>
+@endforelse
+</div>
+</div>
+
+<div class="v5-card">
+<div style="font-size:24px;font-weight:900;">Quick Actions</div>
+
+<div class="v5-actions">
+<a href="{{ route('invoice.create') }}" class="v5-btn">🧾 Create Invoice</a>
+<a href="{{ route('quotes.index') }}" class="v5-btn">📄 Quotes</a>
+<a href="{{ route('customers.index') }}" class="v5-btn">👥 Customers</a>
+<a href="{{ route('invoice.history') }}" class="v5-btn">📊 Reports</a>
+<a href="{{ route('company.settings') }}" class="v5-btn">⚙ Settings</a>
+<a href="{{ route('subscription.portal') }}" class="v5-btn">🚀 Upgrade</a>
+</div>
+
+@if($pendingInvoices > 0)
+<div class="v5-alert">
+You have {{ $pendingInvoices }} pending invoice(s) waiting for payment.
+</div>
+@endif
+
+<div style="margin-top:16px;font-size:24px;font-weight:900;">Stripe Health</div>
+
+<div class="v5-mini-list">
+<div class="row"><span class="v5-muted">API</span><span class="v5-green">Healthy</span></div>
+<div class="row"><span class="v5-muted">Webhook</span><span class="v5-green">Connected</span></div>
+<div class="row"><span class="v5-muted">Mode</span><span>{{ $stripeStatus }}</span></div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const chartData = {!! json_encode($chartDataSafe) !!};
+
+new Chart(document.getElementById('revenueChart'),{
+type:'line',
+data:{
+labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+datasets:[{
+data:chartData,
+borderColor:'#3b82f6',
+backgroundColor:'rgba(59,130,246,.12)',
+fill:true,
+tension:.42,
+borderWidth:3,
+pointRadius:4
+}]
+},
+options:{
+responsive:true,
+maintainAspectRatio:false,
+plugins:{legend:{display:false}},
+scales:{
+x:{ticks:{color:'#94a3b8'},grid:{display:false}},
+y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.04)'}}
+}
+}
+});
+</script>
+
+@endsection

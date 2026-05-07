@@ -3,299 +3,111 @@
 namespace App\Http\Controllers\Billing;
 
 use App\Http\Controllers\Controller;
-use App\Models\Company;
-use App\Helpers\StripeHelper;
 use Illuminate\Http\Request;
+use App\Models\Company;
 use Stripe\Stripe;
 use Stripe\Checkout\Session;
-use Stripe\Subscription;
+use Illuminate\Support\Facades\Mail;
 
 class CheckoutController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | START / RESTART SUBSCRIPTION CHECKOUT
-    |--------------------------------------------------------------------------
-    */
     public function subscribe($companyId)
     {
         $company = Company::findOrFail($companyId);
 
-        if (auth()->check()) {
-            $user = auth()->user();
+        $mode = env('APP_BILLING_MODE', 'test');
 
-            // Super admin can access any company checkout
-            if ($user->role !== 'super_admin' && (int) $user->company_id !== (int) $company->id) {
-                abort(403);
-            }
-        }
+        Stripe::setApiKey($mode === 'live'
+            ? env('STRIPE_SECRET')
+            : env('STRIPE_TEST_SECRET')
+        );
 
-        $plan = strtolower(trim($company->plan_name ?: $company->plan ?: 'starter'));
+        $plan = $company->plan ?? 'starter';
 
-        // normalize aliases
-        if ($plan === 'pro') {
-            $plan = 'premium';
-        }
-
-        $stripe = StripeHelper::forSystem($plan);
-
-        Stripe::setApiKey($stripe['secret']);
-
-        /*
-        |--------------------------------------------------------------------------
-        | IMPORTANT FIX
-        |--------------------------------------------------------------------------
-        | Existing customers upgrading should NEVER get trial text.
-        | If stripe_id exists OR status already exists => no trial block sent.
-        */
-
-        $hasExistingAccount =
-            !empty($company->stripe_id) ||
-            in_array(strtolower($company->subscription_status ?? ''), [
-                'active',
-                'trialing',
-                'cancel_pending',
-                'cancelled',
-                'expired',
-                'past_due',
-                'unpaid'
-            ]);
-
-        $subscriptionData = [
-            'metadata' => [
-                'company_id' => (string) $company->id,
-                'plan'       => $plan,
-            ],
+        $priceMap = [
+            'starter' => env($mode === 'live' ? 'STRIPE_PRICE_STARTER' : 'STRIPE_TEST_PRICE_STARTER'),
+            'growth'  => env($mode === 'live' ? 'STRIPE_PRICE_GROWTH' : 'STRIPE_TEST_PRICE_GROWTH'),
+            'pro'     => env($mode === 'live' ? 'STRIPE_PRICE_PRO' : 'STRIPE_TEST_PRICE_PRO'),
+            'premium' => env($mode === 'live' ? 'STRIPE_PRICE_PREMIUM' : 'STRIPE_TEST_PRICE_PREMIUM'),
         ];
 
-        // ONLY brand new clients get free trial
-        if (!$hasExistingAccount) {
-            $subscriptionData['trial_period_days'] = 5;
-        }
-
         $session = Session::create([
+            'payment_method_types' => ['card'],
             'mode' => 'subscription',
-
-            'customer_email' => $company->email,
-
-            'client_reference_id' => (string) $company->id,
-
-            'metadata' => [
-                'company_id' => (string) $company->id,
-                'plan'       => $plan,
-            ],
-
             'line_items' => [[
-                'price'    => $stripe['price_id'],
+                'price' => $priceMap[$plan],
                 'quantity' => 1,
             ]],
-
-            'subscription_data' => $subscriptionData,
-
-            'payment_method_collection' => 'always',
-
-            'success_url' => url('/dashboard?billing=trial_started'),
-
-            'cancel_url' => url('/subscription?cancelled=1'),
+            'success_url' => url('/billing/success?session_id={CHECKOUT_SESSION_ID}'),
+            'cancel_url' => url('/subscription'),
+            'metadata' => [
+                'company_id' => $company->id,
+                'plan' => $plan,
+            ],
         ]);
 
         return redirect($session->url);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | CUSTOMER BILLING PORTAL
-    |--------------------------------------------------------------------------
-    */
+    public function success(Request $request)
+    {
+        $sessionId = $request->get('session_id');
+
+        if (!$sessionId) {
+            return redirect('/dashboard');
+        }
+
+        $mode = env('APP_BILLING_MODE', 'test');
+
+        Stripe::setApiKey($mode === 'live'
+            ? env('STRIPE_SECRET')
+            : env('STRIPE_TEST_SECRET')
+        );
+
+        $session = Session::retrieve($sessionId);
+
+        $companyId = $session->metadata->company_id ?? null;
+        $plan = $session->metadata->plan ?? 'starter';
+
+        $company = Company::find($companyId);
+
+        if ($company) {
+            $company->plan = $plan;
+            $company->subscription_status = 'active';
+            $company->status = 'Active';
+            $company->save();
+
+            $user = $company->users()->first();
+
+            if ($user) {
+                Mail::send('emails.welcome_subscription', [
+                    'user' => $user,
+                    'company' => $company
+                ], function ($m) use ($user) {
+                    $m->to($user->email)->subject('Welcome to Medios Billing 🚀');
+                });
+            }
+        }
+
+        return view('billing-success');
+    }
+
     public function portal()
     {
         $user = auth()->user();
 
+        if (!$user) return redirect('/login');
+
+        if ($user->role === 'super_admin') {
+            return redirect()->route('admin.dashboard');
+        }
+
         $company = $user->company;
 
-        if (!$company && $user->role === 'super_admin') {
-            $company = \App\Models\Company::first();
+        if (!$company) {
+            return redirect('/dashboard')->with('error', 'No company found.');
         }
 
         return view('billing.portal', compact('company'));
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CANCEL SUBSCRIPTION (AT PERIOD END)
-    |--------------------------------------------------------------------------
-    */
-    public function cancel()
-    {
-        $user = auth()->user();
-
-        $company = $user->company;
-
-        if (!$company && $user->role === 'super_admin') {
-            $company = \App\Models\Company::first();
-        }
-
-        if (!$company) {
-            return back()->with('error', 'Company not found.');
-        }
-
-        try {
-
-            // If no Stripe customer yet, local cancel only
-            if (!$company->stripe_id) {
-
-                $company->update([
-                    'subscription_status' => 'cancelled',
-                    'status'              => 'Cancelled',
-                    'is_active'           => 0,
-                ]);
-
-                return back()->with('success', 'Subscription cancelled.');
-            }
-
-            $stripe = StripeHelper::forSystem();
-            Stripe::setApiKey($stripe['secret']);
-
-            $subscriptions = Subscription::all([
-                'customer' => $company->stripe_id,
-                'limit'    => 1,
-                'status'   => 'all',
-            ]);
-
-            if (!empty($subscriptions->data)) {
-
-                $sub = $subscriptions->data[0];
-
-                Subscription::update($sub->id, [
-                    'cancel_at_period_end' => true,
-                ]);
-
-                $periodEnd = !empty($sub->current_period_end)
-                    ? date('Y-m-d H:i:s', $sub->current_period_end)
-                    : now()->addMonth();
-
-                $company->update([
-                    'subscription_status'  => 'cancel_pending',
-                    'status'               => 'Cancels End Of Cycle',
-                    'subscription_ends_at' => $periodEnd,
-                    'is_active'            => 1,
-                ]);
-
-                return back()->with(
-                    'success',
-                    'Subscription scheduled to cancel at end of billing cycle.'
-                );
-            }
-
-            return back()->with('error', 'No active Stripe subscription found.');
-
-        } catch (\Throwable $e) {
-
-            return back()->with('error', $e->getMessage());
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | REACTIVATE CANCELLATION
-    |--------------------------------------------------------------------------
-    */
-    public function reactivate()
-    {
-        $user = auth()->user();
-
-        $company = $user->company;
-
-        if (!$company && $user->role === 'super_admin') {
-            $company = \App\Models\Company::first();
-        }
-
-        if (!$company) {
-            return back()->with('error', 'Company not found.');
-        }
-
-        try {
-
-            if (!$company->stripe_id) {
-                return back()->with('error', 'No Stripe customer found.');
-            }
-
-            $stripe = StripeHelper::forSystem();
-            Stripe::setApiKey($stripe['secret']);
-
-            $subscriptions = Subscription::all([
-                'customer' => $company->stripe_id,
-                'limit'    => 1,
-                'status'   => 'all',
-            ]);
-
-            if (!empty($subscriptions->data)) {
-
-                $sub = $subscriptions->data[0];
-
-                Subscription::update($sub->id, [
-                    'cancel_at_period_end' => false,
-                ]);
-
-                $company->update([
-                    'subscription_status' => 'active',
-                    'status'              => 'Active',
-                    'is_active'           => 1,
-                ]);
-
-                return back()->with('success', 'Subscription reactivated successfully.');
-            }
-
-            return back()->with('error', 'Subscription not found.');
-
-        } catch (\Throwable $e) {
-
-            return back()->with('error', $e->getMessage());
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CHANGE PLAN (STARTER / GROWTH / PREMIUM)
-    |--------------------------------------------------------------------------
-    */
-    public function changePlan(Request $request)
-    {
-        $user = auth()->user();
-
-        $company = $user->company;
-
-        if (!$company && $user->role === 'super_admin') {
-            $company = \App\Models\Company::first();
-        }
-
-        if (!$company) {
-            return back()->with('error', 'Company not found.');
-        }
-
-        $request->validate([
-            'plan' => 'required|string'
-        ]);
-
-        $plan = strtolower(trim($request->plan));
-
-        // alias support from frontend
-        if ($plan === 'pro') {
-            $plan = 'premium';
-        }
-
-        $allowed = ['starter', 'growth', 'premium'];
-
-        if (!in_array($plan, $allowed)) {
-            return back()->with('error', 'Invalid plan selected.');
-        }
-
-        $company->update([
-            'plan_name' => $plan === 'premium' ? 'Pro' : ucfirst($plan),
-            'plan'      => $plan === 'premium' ? 'Pro' : ucfirst($plan),
-        ]);
-
-        // redirect to checkout so Stripe can switch billing
-        return redirect()->route('checkout.subscribe', $company->id);
     }
 }

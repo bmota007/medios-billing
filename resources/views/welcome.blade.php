@@ -1,667 +1,234 @@
-<!-- SECTION 1 OF 2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-
-<title>Medios Billing | Invoices, Payments & Business Growth</title>
-
-<meta name="description" content="Medios Billing helps service businesses send invoices, collect payments, manage subscriptions, estimates, contracts and customer portals in one platform.">
-
-<meta name="keywords" content="billing software,invoicing software,invoice platform,contractor software,payment software">
-
-<link rel="canonical" href="{{ url('/') }}">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medios Billing | Smart Billing For Modern Businesses</title>
 
 <style>
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-}
-
-html{
-scroll-behavior:smooth;
-}
-
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{
-font-family:'Inter',sans-serif;
-background:#ffffff;
-color:#0f172a;
-overflow-x:hidden;
+    font-family:Arial,Helvetica,sans-serif;
+    background:linear-gradient(135deg,#061327,#0a1f4a,#13377c);
+    color:#fff;
 }
-
-a{
-text-decoration:none;
-color:inherit;
-}
-
 .container{
-max-width:1320px;
-margin:auto;
-padding:0 24px;
+    width:100%;
+    max-width:1180px;
+    margin:auto;
+    padding:0 22px;
 }
-
-/* NAV */
 header{
-position:sticky;
-top:0;
-z-index:999;
-background:rgba(255,255,255,.92);
-backdrop-filter:blur(14px);
-border-bottom:1px solid #eef2f7;
+    padding:24px 0;
 }
-
-.navbar{
-height:84px;
-display:flex;
-justify-content:space-between;
-align-items:center;
+.nav{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
 }
-
 .logo{
-font-size:34px;
-font-weight:800;
-letter-spacing:-1px;
+    font-size:34px;
+    font-weight:900;
 }
-
-.logo span{
-color:#2563eb;
+.logo span{color:#37b8ff}
+.nav a{
+    color:#fff;
+    text-decoration:none;
+    margin-left:18px;
+    font-weight:700;
 }
-
-.nav-links{
-display:flex;
-gap:34px;
-font-size:15px;
-font-weight:600;
-color:#475569;
-}
-
-.nav-right{
-display:flex;
-gap:14px;
-align-items:center;
-}
-
-.btn{
-display:inline-flex;
-align-items:center;
-justify-content:center;
-padding:14px 24px;
-border-radius:14px;
-font-weight:700;
-transition:.2s;
-cursor:pointer;
-}
-
-.btn-outline{
-border:1px solid #cbd5e1;
-background:#fff;
-}
-
-.btn-primary{
-background:#2563eb;
-color:#fff;
-box-shadow:0 16px 30px rgba(37,99,235,.18);
-}
-
-.btn-primary:hover{
-transform:translateY(-2px);
-}
-
-/* HERO */
 .hero{
-padding:80px 0 70px;
-background:
-radial-gradient(circle at top right,#dbeafe 0,#eff6ff 30%,#ffffff 65%);
+    padding:70px 0 50px;
+    text-align:center;
 }
-
-.hero-grid{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:55px;
-align-items:center;
-}
-
-.badge{
-display:inline-block;
-padding:10px 18px;
-border-radius:999px;
-background:#dbeafe;
-color:#2563eb;
-font-size:13px;
-font-weight:800;
-margin-bottom:22px;
-}
-
 .hero h1{
-font-size:72px;
-line-height:1.02;
-font-weight:800;
-letter-spacing:-2px;
-margin-bottom:22px;
+    font-size:56px;
+    line-height:1.1;
+    max-width:860px;
+    margin:auto;
 }
-
-.hero h1 span{
-color:#2563eb;
-}
-
+.hero h1 span{color:#49d2ff}
 .hero p{
-font-size:22px;
-color:#64748b;
-line-height:1.6;
-margin-bottom:30px;
-max-width:620px;
+    margin:22px auto 30px;
+    max-width:760px;
+    color:#d7e6ff;
+    font-size:20px;
+    line-height:1.6;
 }
-
-.hero-actions{
-display:flex;
-gap:16px;
-flex-wrap:wrap;
-margin-bottom:34px;
+.btn{
+    display:inline-block;
+    padding:16px 30px;
+    border-radius:14px;
+    text-decoration:none;
+    font-weight:800;
+    margin:8px;
 }
-
-.stats{
-display:grid;
-grid-template-columns:repeat(4,1fr);
-gap:14px;
+.btn-primary{
+    background:linear-gradient(90deg,#1aa7ff,#45d0ff);
+    color:#001528;
 }
-
-.stat{
-background:#fff;
-border:1px solid #e8eef7;
-border-radius:18px;
-padding:20px;
-text-align:center;
-box-shadow:0 12px 28px rgba(15,23,42,.04);
+.btn-dark{
+    background:rgba(255,255,255,.08);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.12);
 }
-
-.stat strong{
-display:block;
-font-size:28px;
-color:#2563eb;
-font-weight:800;
-margin-bottom:6px;
+.section{
+    padding:55px 0;
 }
-
-.stat span{
-font-size:14px;
-color:#64748b;
+.section-title{
+    text-align:center;
+    font-size:40px;
+    margin-bottom:14px;
 }
-
-/* DASHBOARD MOCKUP */
-.hero-right{
-position:relative;
+.section-sub{
+    text-align:center;
+    color:#d7e6ff;
+    max-width:700px;
+    margin:0 auto 40px;
+    line-height:1.6;
 }
-
-.dashboard{
-background:#fff;
-border:1px solid #e6edf7;
-border-radius:28px;
-padding:24px;
-box-shadow:0 40px 80px rgba(15,23,42,.08);
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:24px;
 }
-
-.top-row{
-display:grid;
-grid-template-columns:repeat(4,1fr);
-gap:14px;
-margin-bottom:18px;
+.card{
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:20px;
+    padding:28px;
+    backdrop-filter:blur(10px);
 }
-
-.mini-box{
-background:#f8fbff;
-border:1px solid #edf2f7;
-padding:16px;
-border-radius:16px;
+.card h3{
+    font-size:28px;
+    margin-bottom:8px;
 }
-
-.mini-box small{
-display:block;
-color:#64748b;
-font-size:12px;
-margin-bottom:8px;
+.price{
+    font-size:36px;
+    font-weight:900;
+    margin:10px 0 18px;
 }
-
-.mini-box strong{
-font-size:26px;
-font-weight:800;
+.price span{
+    font-size:16px;
+    color:#cde3ff;
 }
-
-.chart{
-height:260px;
-border-radius:22px;
-padding:24px;
-background:linear-gradient(180deg,#eff6ff,#ffffff);
-position:relative;
-overflow:hidden;
-border:1px solid #edf2f7;
+.card ul{
+    list-style:none;
+    margin-bottom:22px;
 }
-
-.chart-line{
-position:absolute;
-left:40px;
-bottom:70px;
-width:72%;
-height:4px;
-background:#2563eb;
-transform:skewY(-18deg);
-border-radius:10px;
+.card li{
+    margin-bottom:10px;
+    color:#e6f0ff;
 }
-
-.chart-line.two{
-bottom:105px;
-width:58%;
-background:#60a5fa;
-transform:skewY(-12deg);
+.featured{
+    border:2px solid #3fcfff;
+    transform:scale(1.03);
 }
-
-.chart-badge{
-position:absolute;
-top:22px;
-right:22px;
-padding:8px 12px;
-border-radius:999px;
-background:#dbeafe;
-color:#2563eb;
-font-size:12px;
-font-weight:800;
+footer{
+    padding:45px 0;
+    text-align:center;
+    color:#a9c2ea;
+    font-size:14px;
 }
-
-.phone{
-position:absolute;
-left:-55px;
-bottom:-28px;
-width:180px;
-background:#fff;
-border-radius:28px;
-padding:12px;
-border:1px solid #eef2f7;
-box-shadow:0 30px 60px rgba(15,23,42,.10);
-}
-
-.phone-screen{
-border-radius:22px;
-padding:16px;
-background:#f8fbff;
-text-align:center;
-}
-
-.phone-screen small{
-color:#64748b;
-font-size:12px;
-}
-
-.phone-screen strong{
-display:block;
-font-size:34px;
-color:#16a34a;
-font-weight:800;
-margin:10px 0;
-}
-
-.phone-screen .pill{
-padding:10px;
-border-radius:12px;
-background:#dbeafe;
-color:#2563eb;
-font-weight:700;
-font-size:13px;
-}
-
-/* TRUST */
-.trust{
-padding:28px 0;
-border-top:1px solid #eef2f7;
-border-bottom:1px solid #eef2f7;
-background:#fff;
-}
-
-.trust-row{
-display:grid;
-grid-template-columns:repeat(6,1fr);
-gap:16px;
-text-align:center;
-font-size:15px;
-font-weight:700;
-color:#64748b;
-}
-
-/* MOBILE */
-@media(max-width:1100px){
-
-.hero-grid{
-grid-template-columns:1fr;
-}
-
-.top-row{
-grid-template-columns:1fr 1fr;
-}
-
-.trust-row{
-grid-template-columns:repeat(3,1fr);
-}
-
-.phone{
-display:none;
-}
-}
-
 @media(max-width:768px){
-
-.nav-links{
-display:none;
-}
-
-.hero h1{
-font-size:48px;
-}
-
-.stats,
-.top-row,
-.trust-row{
-grid-template-columns:1fr 1fr;
-}
-
-.hero{
-padding-top:40px;
-}
-
-.hero-actions{
-flex-direction:column;
-align-items:flex-start;
-}
+.hero h1{font-size:38px}
+.hero p{font-size:17px}
+.logo{font-size:28px}
 }
 </style>
 </head>
-
 <body>
 
 <header>
-<div class="container navbar">
-
+<div class="container nav">
 <div class="logo">Medios<span>Billing</span></div>
-
-<nav class="nav-links">
-<a href="#features">Features</a>
-<a href="#solutions">Solutions</a>
-<a href="#plans">Pricing</a>
-<a href="/contact">Resources</a>
-<a href="/contact">About</a>
-</nav>
-
-<div class="nav-right">
-<a href="{{ route('login') }}" class="btn btn-outline">Login</a>
-<a href="/pricing#plans" class="btn btn-primary">Start Free Trial</a>
+<div>
+<a href="/login">Login</a>
+<a href="#pricing">Pricing</a>
 </div>
-
 </div>
 </header>
 
-<section id="features" class="hero">
-<div class="container hero-grid">
-
-<div>
-
-<div class="badge">⚡ GET PAID FASTER. STAY ORGANIZED.</div>
-
-<h1>
-Run Your Business.<br>
-<span>Collect Money.</span><br>
-Automatically.
-</h1>
-
+<section class="hero">
+<div class="container">
+<h1>Invoices, Quotes & Payments <span>Built To Grow Revenue</span></h1>
 <p>
-Invoices, estimates, contracts, subscriptions, reminders,
-customer portals and payments — all in one platform built for modern service businesses.
+Modern businesses need more than invoices. Medios Billing helps you send estimates,
+collect payments, manage customers and grow faster.
 </p>
 
-<div class="hero-actions">
-<a href="/pricing#plans" class="btn btn-primary">Start Free Trial</a>
-<a href="/contact" class="btn btn-outline">Book Demo</a>
-</div>
-
-<div class="stats">
-
-<div class="stat">
-<strong>5X</strong>
-<span>Faster Payments</span>
-</div>
-
-<div class="stat">
-<strong>24/7</strong>
-<span>Customer Portal</span>
-</div>
-
-<div class="stat">
-<strong>100+</strong>
-<span>Automations</span>
-</div>
-
-<div class="stat">
-<strong>$0</strong>
-<span>Setup Hassle</span>
-</div>
-
-</div>
-
-</div>
-
-<div class="hero-right">
-
-<div class="dashboard">
-
-<div class="top-row">
-
-<div class="mini-box">
-<small>Revenue</small>
-<strong>$28k</strong>
-</div>
-
-<div class="mini-box">
-<small>Invoices</small>
-<strong>156</strong>
-</div>
-
-<div class="mini-box">
-<small>Paid</small>
-<strong>$22k</strong>
-</div>
-
-<div class="mini-box">
-<small>Growth</small>
-<strong>+18%</strong>
-</div>
-
-</div>
-
-<div class="chart">
-<div class="chart-badge">+18.2%</div>
-<div class="chart-line"></div>
-<div class="chart-line two"></div>
-</div>
-
-</div>
-
-<div class="phone">
-<div class="phone-screen">
-<small>Invoice Paid</small>
-<strong>$1,250</strong>
-<div class="pill">Download PDF</div>
-</div>
-</div>
-
-</div>
-
+<a href="#pricing" class="btn btn-primary">Start Free Trial</a>
+<a href="/login" class="btn btn-dark">Client Login</a>
 </div>
 </section>
 
-<section id="solutions" class="trust">
-<div class="container trust-row">
-<div>McIntosh Cleaning</div>
-<div>Pronto Painting</div>
-<div>ProWork LLC</div>
-<div>Bright Services</div>
-<div>TopNotch HVAC</div>
-<div>Elite Landscaping</div>
-</div>
-</section>
-
-<section id="plans" class="pricing-section">
-
+<section class="section" id="pricing">
 <div class="container">
 
-<div class="pricing-header">
-<h2>Simple Pricing That <span>Scales</span></h2>
-<p>Choose the perfect plan for your business. Upgrade anytime as you grow.</p>
+<div class="section-title">Choose Your Plan</div>
+<div class="section-sub">
+Simple pricing. Scale as your company grows.
 </div>
 
-<div class="pricing-grid">
+<div class="grid">
 
-<div class="plan-card">
+<div class="card">
 <h3>Starter</h3>
-<p>$49/mo</p>
-<a href="/register?plan=starter" class="btn-outline-plan">Get Started</a>
+<div class="price">$49 <span>/mo</span></div>
+<ul>
+<li>✓ Invoices</li>
+<li>✓ Quotes</li>
+<li>✓ Customers</li>
+<li>✓ Email reminders</li>
+</ul>
+<a href="/register?plan=starter" class="btn btn-primary" style="display:block;text-align:center;">Choose Starter</a>
 </div>
 
-<div class="plan-card">
+<div class="card">
 <h3>Growth</h3>
-<p>$79/mo</p>
-<a href="/register?plan=growth" class="btn-outline-plan">Get Started</a>
+<div class="price">$99 <span>/mo</span></div>
+<ul>
+<li>✓ Everything in Starter</li>
+<li>✓ Team users</li>
+<li>✓ Branding tools</li>
+<li>✓ Faster support</li>
+</ul>
+<a href="/register?plan=growth" class="btn btn-primary" style="display:block;text-align:center;">Choose Growth</a>
 </div>
 
-<div class="plan-card featured">
+<div class="card featured">
 <h3>Pro</h3>
-<p>$129/mo</p>
-<a href="/register?plan=pro" class="btn-primary-plan">Start Scaling</a>
+<div class="price">$179 <span>/mo</span></div>
+<ul>
+<li>✓ Everything in Growth</li>
+<li>✓ Priority tools</li>
+<li>✓ Automation</li>
+<li>✓ Scale ready</li>
+</ul>
+<a href="/register?plan=pro" class="btn btn-primary" style="display:block;text-align:center;">Choose Pro</a>
 </div>
 
-<div class="plan-card">
-<h3>Enterprise</h3>
-<p>$299/mo</p>
-<a href="/contact?plan=enterprise" class="btn-outline-plan">Contact Sales</a>
-</div>
-
-</div>
-
-<div class="trust-bar">
-Trusted by service businesses nationwide • McIntosh Cleaning • Pronto Painting • HVAC • Roofing • Landscaping
-</div>
-
-<div class="pricing-cta">
-
-<div class="cta-left">
-<h3>Ready To Get Paid Faster?</h3>
-<p>Automate invoices, reminders, subscriptions and contracts in one platform.</p>
-</div>
-
-<div class="cta-right">
-<a href="/pricing#plans" class="btn-white">Start Free Trial</a>
-<a href="/contact" class="btn-dark">Book Demo</a>
+<div class="card">
+<h3>Premium</h3>
+<div class="price">$249 <span>/mo</span></div>
+<ul>
+<li>✓ Everything in Pro</li>
+<li>✓ VIP support</li>
+<li>✓ Multi-location</li>
+<li>✓ Enterprise ready</li>
+</ul>
+<a href="/register?plan=premium" class="btn btn-primary" style="display:block;text-align:center;">Choose Premium</a>
 </div>
 
 </div>
-
 </div>
-
-<style>
-.pricing-section{
-padding:100px 0;
-background:linear-gradient(180deg,#ffffff,#f8fbff);
-}
-
-.pricing-grid{
-display:grid;
-grid-template-columns:repeat(4,1fr);
-gap:24px;
-margin-bottom:35px;
-}
-
-.plan-card{
-background:#fff;
-border:1px solid #e6edf7;
-border-radius:24px;
-padding:34px;
-text-align:center;
-}
-
-.featured{
-border:2px solid #7c3aed;
-}
-
-.btn-outline-plan,
-.btn-primary-plan,
-.btn-white,
-.btn-dark{
-display:inline-block;
-padding:16px 24px;
-border-radius:14px;
-font-weight:800;
-margin-top:16px;
-}
-
-.btn-outline-plan{
-border:1px solid #cbd5e1;
-}
-
-.btn-primary-plan{
-background:#2563eb;
-color:#fff;
-}
-
-.btn-white{
-background:#fff;
-color:#2563eb;
-}
-
-.btn-dark{
-background:#0f172a;
-color:#fff;
-}
-
-.trust-bar{
-text-align:center;
-padding:20px 0;
-color:#64748b;
-}
-
-.pricing-cta{
-background:linear-gradient(135deg,#2563eb,#60a5fa);
-padding:55px;
-border-radius:28px;
-display:flex;
-justify-content:space-between;
-align-items:center;
-gap:20px;
-color:#fff;
-}
-
-@media(max-width:1100px){
-.pricing-grid{
-grid-template-columns:1fr 1fr;
-}
-}
-
-@media(max-width:768px){
-.pricing-grid{
-grid-template-columns:1fr;
-}
-
-.pricing-cta{
-flex-direction:column;
-text-align:center;
-}
-}
-</style>
-
 </section>
 
-<footer style="padding:40px 20px;text-align:center;color:#64748b;font-size:14px;border-top:1px solid #eef2f7;">
-© {{ date('Y') }} Medios Billing • Powered by
-<a href="https://medioscorporativos.com" target="_blank">Medios Corporativos</a>
+<footer>
+<div class="container">
+© 2026 Medios Billing • Powered by MediosCorporativos
+</div>
 </footer>
 
 </body>

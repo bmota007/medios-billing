@@ -6,59 +6,48 @@ use App\Models\Company;
 
 class StripeHelper
 {
-    /*
-    |--------------------------------------------------------------------------
-    | PLAN PRICE IDS (LIVE MODE)
-    |--------------------------------------------------------------------------
-    */
+    public static function billingMode(): string
+    {
+        return env('APP_BILLING_MODE', 'live');
+    }
 
     public static function planPriceId(string $plan = 'starter'): ?string
     {
         $plan = strtolower(trim($plan));
 
-        // alias support
-        if ($plan === 'pro') {
-            $plan = 'premium';
-        }
+        if (self::billingMode() === 'test') {
 
-        $map = [
-            'starter' => env('STRIPE_PRICE_STARTER'),
-            'growth'  => env('STRIPE_PRICE_GROWTH'),
-            'premium' => env('STRIPE_PRICE_PREMIUM'),
-        ];
+            $map = [
+                'starter' => env('STRIPE_TEST_PRICE_STARTER'),
+                'growth'  => env('STRIPE_TEST_PRICE_GROWTH'),
+                'pro'     => env('STRIPE_TEST_PRICE_PRO'),
+                'premium' => env('STRIPE_TEST_PRICE_PREMIUM'),
+            ];
+
+        } else {
+
+            $map = [
+                'starter' => env('STRIPE_PRICE_STARTER'),
+                'growth'  => env('STRIPE_PRICE_GROWTH'),
+                'pro'     => env('STRIPE_PRICE_PRO'),
+                'premium' => env('STRIPE_PRICE_PREMIUM'),
+            ];
+        }
 
         return $map[$plan] ?? $map['starter'];
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | PLAN MONTHLY PRICE (DISPLAY / INTERNAL)
-    |--------------------------------------------------------------------------
-    */
-
-    public static function monthlyAmount(string $plan = 'starter'): float
+    public static function monthlyAmount(string $plan='starter'): float
     {
-        $plan = strtolower(trim($plan));
-
-        // alias support
-        if ($plan === 'pro') {
-            $plan = 'premium';
-        }
-
         $map = [
-            'starter' => 49.00,
-            'growth'  => 99.00,
-            'premium' => 179.00,
+            'starter' => 49,
+            'growth'  => 79,
+            'pro'     => 129,
+            'premium' => 249,
         ];
 
-        return $map[$plan] ?? 49.00;
+        return $map[$plan] ?? 49;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | COMPANY STRIPE KEYS (TENANT PAYMENTS)
-    |--------------------------------------------------------------------------
-    */
 
     public static function forCompany(?Company $company = null): array
     {
@@ -70,38 +59,44 @@ class StripeHelper
 
         if ($mode === 'live') {
             return [
-                'mode'     => 'live',
-                'public'   => $company->stripe_publishable_key ?: env('STRIPE_KEY'),
-                'secret'   => $company->stripe_secret_key ?: env('STRIPE_SECRET'),
-                'webhook'  => $company->stripe_webhook_secret ?: env('STRIPE_WEBHOOK_SECRET'),
-                'price_id' => null,
+                'mode'    => 'live',
+                'public'  => $company->stripe_publishable_key,
+                'secret'  => $company->stripe_secret_key,
+                'webhook' => $company->stripe_webhook_secret,
+                'price_id'=> null,
             ];
         }
 
         return [
-            'mode'     => 'test',
-            'public'   => $company->stripe_test_publishable_key ?: env('STRIPE_KEY'),
-            'secret'   => $company->stripe_test_secret_key ?: env('STRIPE_SECRET'),
-            'webhook'  => $company->stripe_test_webhook_secret ?: env('STRIPE_WEBHOOK_SECRET'),
-            'price_id' => null,
+            'mode'    => 'test',
+            'public'  => $company->stripe_test_publishable_key,
+            'secret'  => $company->stripe_test_secret_key,
+            'webhook' => $company->stripe_webhook_secret,
+            'price_id'=> null,
         ];
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SYSTEM BILLING (MEDIOS BILLING SaaS)
-    |--------------------------------------------------------------------------
-    */
-
-    public static function forSystem(string $plan = 'starter'): array
+    public static function forSystem(string $plan='starter'): array
     {
+        if (self::billingMode() === 'test') {
+
+            return [
+                'mode'    => 'test',
+                'public'  => env('STRIPE_TEST_KEY'),
+                'secret'  => env('STRIPE_TEST_SECRET'),
+                'webhook' => env('STRIPE_WEBHOOK_SECRET'),
+                'price_id'=> self::planPriceId($plan),
+                'amount'  => self::monthlyAmount($plan),
+            ];
+        }
+
         return [
-            'mode'     => 'system',
-            'public'   => env('STRIPE_KEY'),
-            'secret'   => env('STRIPE_SECRET'),
-            'webhook'  => env('STRIPE_WEBHOOK_SECRET'),
-            'price_id' => self::planPriceId($plan),
-            'amount'   => self::monthlyAmount($plan),
+            'mode'    => 'live',
+            'public'  => env('STRIPE_KEY'),
+            'secret'  => env('STRIPE_SECRET'),
+            'webhook' => env('STRIPE_WEBHOOK_SECRET'),
+            'price_id'=> self::planPriceId($plan),
+            'amount'  => self::monthlyAmount($plan),
         ];
     }
 }

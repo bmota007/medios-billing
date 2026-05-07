@@ -50,12 +50,14 @@ class Invoice extends Model
         return $this->hasMany(\App\Models\InvoiceItem::class, 'invoice_id', 'id');
     }
 
-    /**
-     * This helper ensures that if we have JSON items in the column, 
-     * they are decoded properly for the view loops.
-     */
     public function getDecodedItemsAttribute()
     {
         return json_decode($this->items, true) ?? [];
+    }
+
+    // 🔥 CUSTOMER RELATIONSHIP (FIXED INSIDE CLASS)
+    public function customer()
+    {
+        return $this->belongsTo(\App\Models\Customer::class, 'customer_id');
     }
 }

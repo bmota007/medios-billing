@@ -1,0 +1,29 @@
+@extends('layouts.app')
+
+@section('content')
+<div style="max-width:600px;margin:50px auto;background:#fff;padding:30px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.1);">
+
+    <h2 style="margin-bottom:20px;">Pay Invoice #{{ $invoice->invoice_no }}</h2>
+
+    <p><strong>Customer:</strong> {{ $invoice->customer->name ?? '' }}</p>
+    <p><strong>Total:</strong> ${{ number_format($invoice->total,2) }}</p>
+
+<form action="{{ route('stripe.post', $invoice->id) }}" method="POST">
+    @csrf
+
+    <script
+        src="https://checkout.stripe.com/checkout.js"
+        class="stripe-button"
+        data-key="{{ $invoice->company->stripe_mode === 'test'
+            ? $invoice->company->stripe_test_publishable_key
+            : $invoice->company->stripe_publishable_key }}"
+        data-amount="{{ $invoice->total * 100 }}"
+        data-name="{{ $invoice->company->name }}"
+        data-description="Invoice {{ $invoice->invoice_no }}"
+        data-currency="usd"
+        data-email="{{ $invoice->customer_email ?? '' }}">
+    </script>
+</form>
+
+</div>
+@endsection

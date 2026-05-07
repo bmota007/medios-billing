@@ -1,0 +1,412 @@
+@extends('layouts.app')
+
+@section('content')
+
+<div class="pricing-wrap">
+
+    <section class="hero">
+
+        <span class="mini-badge">MEDIOS BILLING • 7 DAY FREE TRIAL</span>
+
+        <h1>Get Paid Faster. Run Your Business Smarter.</h1>
+
+        <p>
+            Invoices, quotes, contracts, customer management, payments and growth tools —
+            all in one premium platform built for service businesses.
+        </p>
+
+        <div class="trust-row">
+            <span>✔ No Contracts</span>
+            <span>✔ Cancel Anytime</span>
+            <span>✔ Secure Checkout</span>
+            <span>✔ Start in Minutes</span>
+        </div>
+
+    </section>
+
+    <section class="toggle-wrap">
+        <div class="billing-toggle">
+            <button class="toggle-btn active" onclick="setMonthly()">Monthly</button>
+            <button class="toggle-btn" onclick="setYearly()">Yearly <small>Save 20%</small></button>
+        </div>
+    </section>
+
+    <section class="plans-grid">
+
+        @foreach($plans as $plan)
+
+        @php
+            $featured = in_array(strtolower($plan->name), ['growth','pro','premium']);
+        @endphp
+
+        <div class="price-card {{ $featured ? 'featured' : '' }}">
+
+            @if($plan->badge)
+                <div class="plan-badge">{{ $plan->badge }}</div>
+            @elseif($featured)
+                <div class="plan-badge">MOST POPULAR</div>
+            @endif
+
+            <h2>{{ $plan->name }}</h2>
+
+            <p class="plan-desc">
+                @if(strtolower($plan->name)=='starter')
+                    Perfect for solo owners launching fast.
+                @elseif(strtolower($plan->name)=='growth')
+                    Best for growing teams needing automation.
+                @else
+                    Advanced tools for serious operators.
+                @endif
+            </p>
+
+            <div class="price">
+                <span class="currency">$</span>
+
+                <span class="monthly-price">
+                    {{ number_format($plan->price,0) }}
+                </span>
+
+                <span class="yearly-price" style="display:none;">
+                    {{ number_format($plan->yearly_price / 12,0) }}
+                </span>
+
+                <small>/mo</small>
+            </div>
+
+            <div class="save-note yearly-price" style="display:none;">
+                Billed annually • Save money
+            </div>
+
+            <ul class="features">
+                @foreach(explode(',', $plan->features) as $feature)
+                    <li>✔ {{ trim($feature) }}</li>
+                @endforeach
+            </ul>
+
+            <a href="/register?plan={{ $plan->slug }}" class="plan-btn">
+                Start 7-Day Free Trial
+            </a>
+
+        </div>
+
+        @endforeach
+
+    </section>
+
+    <section class="bottom-proof">
+
+        <h3>Built for Real Businesses</h3>
+
+        <div class="proof-grid">
+            <div class="proof-card">Cleaning Companies</div>
+            <div class="proof-card">Painters</div>
+            <div class="proof-card">Contractors</div>
+            <div class="proof-card">Roofing</div>
+            <div class="proof-card">Landscaping</div>
+            <div class="proof-card">Agencies</div>
+        </div>
+
+    </section>
+
+    <section class="faq">
+
+        <h3>Frequently Asked Questions</h3>
+
+        <div class="faq-grid">
+            <div class="faq-card">
+                <strong>Do I need a contract?</strong>
+                <p>No. Cancel anytime.</p>
+            </div>
+
+            <div class="faq-card">
+                <strong>Can I accept card payments?</strong>
+                <p>Yes. Stripe powered secure checkout.</p>
+            </div>
+
+            <div class="faq-card">
+                <strong>Can I upgrade later?</strong>
+                <p>Yes. Change plans anytime.</p>
+            </div>
+
+            <div class="faq-card">
+                <strong>How fast can I start?</strong>
+                <p>Usually under 5 minutes.</p>
+            </div>
+        </div>
+
+    </section>
+
+</div>
+
+<style>
+body{
+background:
+radial-gradient(circle at top left,rgba(37,99,235,.10),transparent 28%),
+radial-gradient(circle at bottom right,rgba(124,58,237,.10),transparent 28%),
+linear-gradient(135deg,#07111f,#08192d,#06101d);
+}
+
+.pricing-wrap{
+max-width:1450px;
+margin:auto;
+padding:60px 24px 80px;
+}
+
+.hero{
+text-align:center;
+margin-bottom:34px;
+}
+
+.mini-badge{
+display:inline-block;
+padding:10px 18px;
+border-radius:999px;
+background:rgba(37,99,235,.16);
+color:#93c5fd;
+font-size:13px;
+font-weight:800;
+margin-bottom:18px;
+}
+
+.hero h1{
+font-size:64px;
+line-height:1.05;
+font-weight:900;
+color:#fff;
+max-width:980px;
+margin:0 auto 18px;
+}
+
+.hero p{
+max-width:860px;
+margin:auto;
+font-size:20px;
+line-height:1.7;
+color:#94a3b8;
+}
+
+.trust-row{
+display:flex;
+justify-content:center;
+gap:18px;
+flex-wrap:wrap;
+margin-top:22px;
+color:#dbeafe;
+font-size:14px;
+font-weight:700;
+}
+
+.toggle-wrap{
+display:flex;
+justify-content:center;
+margin:36px 0 42px;
+}
+
+.billing-toggle{
+display:flex;
+gap:12px;
+padding:8px;
+border-radius:18px;
+background:rgba(255,255,255,.03);
+border:1px solid rgba(255,255,255,.06);
+}
+
+.toggle-btn{
+background:transparent;
+border:none;
+color:#fff;
+padding:14px 24px;
+border-radius:14px;
+font-weight:800;
+cursor:pointer;
+}
+
+.toggle-btn.active{
+background:#2563eb;
+}
+
+.toggle-btn small{
+font-size:11px;
+opacity:.8;
+}
+
+.plans-grid{
+display:grid;
+grid-template-columns:repeat(4,1fr);
+gap:22px;
+}
+
+.price-card{
+background:linear-gradient(180deg,#081222,#09182b);
+border:1px solid rgba(255,255,255,.06);
+border-radius:26px;
+padding:34px 28px;
+color:#fff;
+box-shadow:0 25px 50px rgba(0,0,0,.24);
+position:relative;
+}
+
+.price-card.featured{
+transform:scale(1.03);
+border-color:#2563eb;
+box-shadow:0 35px 70px rgba(37,99,235,.20);
+}
+
+.plan-badge{
+display:inline-block;
+padding:7px 14px;
+border-radius:999px;
+background:#2563eb;
+font-size:12px;
+font-weight:900;
+margin-bottom:16px;
+}
+
+.price-card h2{
+font-size:34px;
+font-weight:900;
+margin-bottom:8px;
+}
+
+.plan-desc{
+color:#94a3b8;
+font-size:14px;
+min-height:40px;
+margin-bottom:14px;
+}
+
+.price{
+font-size:56px;
+font-weight:900;
+margin-bottom:10px;
+}
+
+.currency{
+font-size:24px;
+vertical-align:top;
+}
+
+.price small{
+font-size:18px;
+color:#94a3b8;
+font-weight:600;
+}
+
+.save-note{
+font-size:13px;
+color:#10b981;
+font-weight:800;
+margin-bottom:16px;
+}
+
+.features{
+list-style:none;
+padding:0;
+margin:0 0 28px;
+}
+
+.features li{
+padding:10px 0;
+border-bottom:1px solid rgba(255,255,255,.04);
+color:#dbeafe;
+font-size:15px;
+}
+
+.plan-btn{
+display:block;
+text-align:center;
+text-decoration:none;
+padding:16px;
+border-radius:14px;
+font-weight:900;
+background:linear-gradient(135deg,#2563eb,#7c3aed);
+color:#fff;
+}
+
+.plan-btn:hover{
+opacity:.95;
+transform:translateY(-1px);
+}
+
+.bottom-proof,.faq{
+margin-top:70px;
+text-align:center;
+}
+
+.bottom-proof h3,.faq h3{
+font-size:34px;
+font-weight:900;
+color:#fff;
+margin-bottom:26px;
+}
+
+.proof-grid{
+display:grid;
+grid-template-columns:repeat(6,1fr);
+gap:14px;
+}
+
+.proof-card,.faq-card{
+background:#081226;
+border:1px solid rgba(255,255,255,.06);
+border-radius:18px;
+padding:18px;
+color:#dbeafe;
+}
+
+.faq-grid{
+display:grid;
+grid-template-columns:repeat(4,1fr);
+gap:16px;
+text-align:left;
+}
+
+.faq-card strong{
+display:block;
+color:#fff;
+margin-bottom:8px;
+}
+
+.faq-card p{
+margin:0;
+color:#94a3b8;
+font-size:14px;
+}
+
+@media(max-width:1200px){
+.plans-grid{grid-template-columns:repeat(2,1fr);}
+.proof-grid{grid-template-columns:repeat(3,1fr);}
+.faq-grid{grid-template-columns:repeat(2,1fr);}
+.hero h1{font-size:48px;}
+}
+
+@media(max-width:768px){
+.plans-grid,
+.proof-grid,
+.faq-grid{
+grid-template-columns:1fr;
+}
+.hero h1{font-size:36px;}
+.hero p{font-size:17px;}
+.price-card.featured{transform:none;}
+.trust-row{flex-direction:column;gap:10px;}
+}
+</style>
+
+<script>
+function setMonthly(){
+document.querySelectorAll('.monthly-price').forEach(el=>el.style.display='inline');
+document.querySelectorAll('.yearly-price').forEach(el=>el.style.display='none');
+document.querySelectorAll('.toggle-btn')[0].classList.add('active');
+document.querySelectorAll('.toggle-btn')[1].classList.remove('active');
+}
+
+function setYearly(){
+document.querySelectorAll('.monthly-price').forEach(el=>el.style.display='none');
+document.querySelectorAll('.yearly-price').forEach(el=>el.style.display='inline');
+document.querySelectorAll('.toggle-btn')[1].classList.add('active');
+document.querySelectorAll('.toggle-btn')[0].classList.remove('active');
+}
+</script>
+
+@endsection

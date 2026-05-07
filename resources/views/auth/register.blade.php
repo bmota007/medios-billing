@@ -1,194 +1,176 @@
-@extends('layouts.guest')
-
-@section('content')
-<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style="background:linear-gradient(135deg,#020617,#0f172a,#111827);">
-
-    <div class="max-w-md w-full space-y-6 glass-card p-10">
-
-        <div class="text-center">
-            <h2 class="mt-2 text-3xl font-extrabold text-white">
-                Start Your <span style="color:#38bdf8;">MediosBilling</span> Trial
-            </h2>
-
-            <p class="mt-3 text-sm" style="color:#94a3b8;">
-                5-Day Free Trial • Card Required • Cancel Anytime During Trial
-            </p>
-        </div>
-
-<form class="mt-8 space-y-6" action="{{ route('register') }}" method="POST">
-            @csrf
-
-            @if ($errors->any())
-                <div style="background:rgba(239,68,68,.15); border:1px solid #ef4444; color:#fca5a5; padding:14px; border-radius:12px;">
-                    <ul class="list-disc list-inside text-sm">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            <input type="hidden" name="plan" id="planInput" value="starter">
-
-            <!-- PLAN BANNER -->
-            <div id="planBanner" class="plan-banner">
-
-                <div>
-                    <p id="planLabel" class="text-label mb-1">Selected Plan</p>
-                    <h3 id="planName" class="text-xl font-extrabold text-white">Starter Plan</h3>
-                </div>
-
-                <div class="text-right">
-                    <span id="planPrice" class="text-3xl font-black text-white">$49</span>
-                    <div class="text-xs text-slate-400">per month</div>
-                </div>
-
-            </div>
-
-            <!-- FORM -->
-            <div class="space-y-4">
-
-                <div>
-                    <label class="text-label">Company Name</label>
-                    <input type="text" name="company_name" required class="custom-input w-full mt-1" placeholder="Pronto Painting LLC">
-                </div>
-
-                <div>
-                    <label class="text-label">Your Full Name</label>
-                    <input type="text" name="name" required class="custom-input w-full mt-1" placeholder="John Doe">
-                </div>
-
-                <div>
-                    <label class="text-label">Business Email</label>
-                    <input type="email" name="email" required class="custom-input w-full mt-1" placeholder="owner@company.com">
-                </div>
-
-                <div>
-                    <label class="text-label">Password</label>
-                    <input type="password" name="password" required class="custom-input w-full mt-1">
-                </div>
-
-                <div>
-                    <label class="text-label">Confirm Password</label>
-                    <input type="password" name="password_confirmation" required class="custom-input w-full mt-1">
-                </div>
-
-            </div>
-
-            <button type="submit" class="submit-btn w-full py-3 px-4 rounded-xl font-bold">
-                Continue To Secure Checkout
-            </button>
-
-            <div class="text-center mt-4 text-sm text-slate-400">
-                Already have an account?
-                <a href="{{ route('login') }}" class="font-bold text-sky-400 no-underline">
-                    Sign In
-                </a>
-            </div>
-
-        </form>
-
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const queryPlan = (urlParams.get('plan') || '').toLowerCase();
-    const hashPlan  = window.location.hash.replace('#','').toLowerCase();
-
-    const selectedPlan = queryPlan || hashPlan || 'starter';
-
-    const planInput  = document.getElementById('planInput');
-    const planBanner = document.getElementById('planBanner');
-    const planName   = document.getElementById('planName');
-    const planPrice  = document.getElementById('planPrice');
-
-    const plans = {
-        starter: {
-            name:'Starter Plan',
-            price:'$49',
-            color:'#f8fafc',
-            bg:'rgba(255,255,255,.06)'
-        },
-        growth: {
-            name:'Growth Plan',
-            price:'$129',
-            color:'#38bdf8',
-            bg:'rgba(56,189,248,.14)'
-        },
-        premium: {
-            name:'Premium Plan',
-            price:'$499',
-            color:'#a855f7',
-            bg:'rgba(168,85,247,.14)'
-        }
-    };
-
-    const data = plans[selectedPlan] || plans.starter;
-
-    planInput.value = selectedPlan;
-    planBanner.style.background = data.bg;
-    planBanner.style.borderColor = data.color + '50';
-
-    planName.innerText = data.name;
-    planPrice.innerText = data.price;
-    planPrice.style.color = data.color;
-});
-</script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Account | Medios Billing</title>
+<meta name="csrf-token" content="{{ csrf_token() }}">
 
 <style>
-.glass-card{
-    background:rgba(15,23,42,.72);
-    border:1px solid rgba(255,255,255,.08);
-    backdrop-filter:blur(18px);
-    border-radius:22px;
-    box-shadow:0 25px 70px rgba(0,0,0,.45);
-}
-
-.plan-banner{
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+    font-family:Arial,Helvetica,sans-serif;
+    background:linear-gradient(135deg,#07122a,#0b1d44,#132f6d);
+    min-height:100vh;
     display:flex;
-    justify-content:space-between;
     align-items:center;
-    padding:18px 20px;
-    border-radius:16px;
-    border:1px solid rgba(255,255,255,.08);
-    transition:.25s;
-}
-
-.custom-input{
-    background:rgba(255,255,255,.04);
-    border:1px solid rgba(255,255,255,.10);
+    justify-content:center;
+    padding:30px;
     color:#fff;
-    padding:13px 14px;
-    border-radius:12px;
+}
+.wrap{width:100%;max-width:520px}
+.card{
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:22px;
+    padding:38px;
+    backdrop-filter:blur(12px);
+    box-shadow:0 30px 60px rgba(0,0,0,.35);
+}
+.logo{font-size:34px;font-weight:800;margin-bottom:8px}
+.logo span{color:#37b8ff}
+.sub{color:#d5e6ff;margin-bottom:24px;font-size:15px}
+.planbox{
+    background:rgba(55,184,255,.12);
+    border:1px solid rgba(55,184,255,.35);
+    padding:14px 16px;
+    border-radius:14px;
+    margin-bottom:22px;
+}
+.planbox strong{color:#7dd7ff;font-size:15px}
+label{
+    display:block;
+    margin-bottom:7px;
+    font-size:14px;
+    color:#dce9ff;
+}
+.input{
     width:100%;
-}
-
-.custom-input:focus{
+    padding:14px 15px;
+    border:none;
     outline:none;
-    border-color:#38bdf8;
-    box-shadow:0 0 0 4px rgba(56,189,248,.15);
+    border-radius:12px;
+    background:#fff;
+    color:#111;
+    font-size:15px;
+    margin-bottom:16px;
 }
-
-.text-label{
-    font-size:.70rem;
-    text-transform:uppercase;
-    letter-spacing:1.3px;
-    color:#94a3b8;
+.btn{
+    width:100%;
+    padding:15px;
+    border:none;
+    border-radius:12px;
+    background:linear-gradient(90deg,#1aa7ff,#45d0ff);
+    color:#001529;
     font-weight:800;
+    font-size:16px;
+    cursor:pointer;
 }
-
-.submit-btn{
-    background:linear-gradient(135deg,#38bdf8,#2563eb);
-    color:white;
-    transition:.25s;
+.bottom{
+    margin-top:18px;
+    text-align:center;
+    font-size:14px;
+    color:#d5e6ff;
 }
-
-.submit-btn:hover{
-    transform:translateY(-2px);
-    box-shadow:0 15px 30px rgba(37,99,235,.35);
+.bottom a{
+    color:#7dd7ff;
+    text-decoration:none;
+    font-weight:700;
+}
+.errors{
+    background:#7a1020;
+    border:1px solid #ff5e79;
+    color:#fff;
+    padding:14px;
+    border-radius:12px;
+    margin-bottom:18px;
+    font-size:14px;
+}
+.errors ul{margin-left:18px;margin-top:6px}
+.small{
+    margin-top:18px;
+    text-align:center;
+    font-size:12px;
+    color:#9ab8e8;
+}
+@media(max-width:600px){
+.card{padding:24px}
 }
 </style>
-@endsection
+</head>
+<body>
+
+@php
+$plan = request('plan','starter');
+
+$plans = [
+    'starter' => ['name'=>'Starter','price'=>'$49/mo'],
+    'growth'  => ['name'=>'Growth','price'=>'$79/mo'],
+    'pro'     => ['name'=>'Pro','price'=>'$129/mo'],
+    'premium' => ['name'=>'Premium','price'=>'$249/mo'],
+];
+
+$current = $plans[$plan] ?? $plans['starter'];
+@endphp
+
+<div class="wrap">
+<div class="card">
+
+<div class="logo">Medios<span>Billing</span></div>
+<div class="sub">Launch your business billing portal in minutes.</div>
+
+<div class="planbox">
+<strong>Selected Plan:</strong><br>
+{{ $current['name'] }} — {{ $current['price'] }}
+</div>
+
+@if ($errors->any())
+<div class="errors">
+<strong>Please fix the following:</strong>
+<ul>
+@foreach ($errors->all() as $error)
+<li>{{ $error }}</li>
+@endforeach
+</ul>
+</div>
+@endif
+
+<form method="POST" action="{{ route('register') }}">
+@csrf
+<input type="hidden" name="plan" value="{{ request("plan") }}">
+
+<input type="hidden" name="plan" value="{{ $plan }}">
+
+<label>Company Name</label>
+<input type="text" name="company_name" class="input" value="{{ old('company_name') }}" required>
+
+<label>Your Full Name</label>
+<input type="text" name="name" class="input" value="{{ old('name') }}" required>
+
+<label>Email Address</label>
+<input type="email" name="email" class="input" value="{{ old('email') }}" required>
+
+<label>Password</label>
+<input type="password" name="password" class="input" required>
+
+<label>Confirm Password</label>
+<input type="password" name="password_confirmation" class="input" required>
+
+<button type="submit" class="btn">Create Account & Continue</button>
+
+</form>
+
+<div class="bottom">
+Already have an account?
+<a href="{{ route('login') }}">Login</a>
+</div>
+
+<div class="small">
+Secure signup powered by Medios Billing
+</div>
+
+</div>
+</div>
+
+</body>
+</html>

@@ -3,9 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Company;
 use App\Models\Invoice;
-use App\Models\Quote;
 use App\Models\Customer;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,14 +16,22 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
 
-        // ✅ NEW POLISH:
-        // If Super Admin hits /dashboard send to admin dashboard
+        /*
+        |--------------------------------------------------------------------------
+        | SUPER ADMIN NEVER USES TENANT DASHBOARD
+        |--------------------------------------------------------------------------
+        */
         if ($user && $user->role === 'super_admin') {
             return redirect()->route('admin.dashboard');
         }
 
-        // Force Houston Time for greeting
+        /*
+        |--------------------------------------------------------------------------
+        | GREETING
+        |--------------------------------------------------------------------------
+        */
         date_default_timezone_set('America/Chicago');
+
         $hour = date('H');
 
         if ($hour < 12) {
@@ -36,18 +42,35 @@ class DashboardController extends Controller
             $greeting = 'Good Evening';
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | COMPANY REQUIRED
+        |--------------------------------------------------------------------------
+        */
         $company = $user->company;
 
         if (!$company) {
-            return redirect('/login')->with('error', 'Company profile not found.');
+            return redirect('/login')->with(
+                'error',
+                'Company profile not found.'
+            );
         }
 
-        // Stripe Success Logic
-        if ($request->has('session_id') && $company->subscription_status === 'pending') {
+        /*
+        |--------------------------------------------------------------------------
+        | STRIPE RETURN SUCCESS
+        |--------------------------------------------------------------------------
+        */
+        if (
+            $request->has('session_id') &&
+            $company->subscription_status === 'pending'
+        ) {
             try {
                 Stripe::setApiKey(env('STRIPE_SECRET'));
 
-                $session = Session::retrieve($request->get('session_id'));
+                $session = Session::retrieve(
+                    $request->get('session_id')
+                );
 
                 if (
                     $session->payment_status === 'paid' ||
@@ -59,51 +82,197 @@ class DashboardController extends Controller
                         'stripe_customer_id' => $session->customer,
                     ]);
                 }
-
             } catch (\Exception $e) {
-                \Log::error("Stripe Activation Error: " . $e->getMessage());
+                \Log::error(
+                    'Stripe Activation Error: '.$e->getMessage()
+                );
             }
         }
 
-        // Stats
-        $stats = [
-            'total_revenue' => Invoice::where('company_id', $company->id)->where('status', 'paid')->sum('total'),
-            'total_invoices' => Invoice::where('company_id', $company->id)->count(),
-            'paid_invoices' => Invoice::where('company_id', $company->id)->where('status', 'paid')->count(),
-            'pending_invoices' => Invoice::where('company_id', $company->id)->where('status', 'pending')->count(),
-        ];
+        /*
+        |--------------------------------------------------------------------------
+        | ROLE FLAGS
+        |--------------------------------------------------------------------------
+        */
+        $role = $user->role;
 
-        // Graph
+        $canCustomers = in_array($role, [
+            'owner',
+            'admin',
+            'regional_director',
+            'manager',
+            'sales_director',
+            'support'
+        ]);
+
+        $canQuotes = in_array($role, [
+            'owner',
+            'admin',
+            'regional_director',
+            'manager',
+            'sales_director'
+        ]);
+
+        $canInvoices = in_array($role, [
+            'owner',
+            'admin',
+            'regional_director',
+            'manager',
+            'accounting'
+        ]);
+
+        $canUsers = in_array($role, [
+            'owner',
+            'admin',
+            'regional_director',
+            'manager'
+        ]);
+
+        $canBrand = in_array($role, [
+            'owner',
+            'admin',
+            'regional_director'
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | BASE QUERIES
+        |--------------------------------------------------------------------------
+        */
+        $invoiceQuery = Invoice::where('company_id', $company->id);
+
+        /*
+        |--------------------------------------------------------------------------
+        | ROLE-SPECIFIC DASHBOARD STATS
+        |--------------------------------------------------------------------------
+        */
+        if ($role === 'accounting') {
+
+            $stats = [
+                'total_revenue' => (clone $invoiceQuery)
+                    ->where('status', 'paid')
+                    ->sum('total'),
+
+                'total_invoices' => (clone $invoiceQuery)->count(),
+
+                'paid_invoices' => (clone $invoiceQuery)
+                    ->where('status', 'paid')
+                    ->count(),
+
+                'pending_invoices' => (clone $invoiceQuery)
+                    ->whereIn('status', ['pending', 'sent', 'partial'])
+                    ->count(),
+            ];
+
+        } elseif (in_array($role, ['sales_director'])) {
+
+            $stats = [
+                'total_revenue' => (clone $invoiceQuery)
+                    ->where('status', 'paid')
+                    ->sum('total'),
+
+                'total_invoices' => (clone $invoiceQuery)->count(),
+
+                'paid_invoices' => (clone $invoiceQuery)
+                    ->where('status', 'paid')
+                    ->count(),
+
+                'pending_invoices' => (clone $invoiceQuery)
+                    ->whereIn('status', ['pending', 'sent', 'partial'])
+                    ->count(),
+            ];
+
+        } else {
+
+            $stats = [
+                'total_revenue' => (clone $invoiceQuery)
+                    ->where('status', 'paid')
+                    ->sum('total'),
+
+                'total_invoices' => (clone $invoiceQuery)->count(),
+
+                'paid_invoices' => (clone $invoiceQuery)
+                    ->where('status', 'paid')
+                    ->count(),
+
+                'pending_invoices' => (clone $invoiceQuery)
+                    ->whereIn('status', ['pending', 'sent', 'partial'])
+                    ->count(),
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHART DATA
+        |--------------------------------------------------------------------------
+        */
         $chartData = array_fill(0, 12, 0);
 
         try {
             $monthlyRevenue = Invoice::where('company_id', $company->id)
                 ->where('status', 'paid')
-                ->whereYear('paid_at', date('Y'))
-                ->select(DB::raw('SUM(total) as aggregate'), DB::raw('MONTH(paid_at) as month'))
+                ->whereYear('created_at', now()->year)
+                ->select(
+                    DB::raw('SUM(total) as aggregate'),
+                    DB::raw('MONTH(created_at) as month')
+                )
                 ->groupBy('month')
                 ->get();
 
             foreach ($monthlyRevenue as $data) {
-                $chartData[$data->month - 1] = (float) $data->aggregate;
+                $chartData[$data->month - 1] =
+                    (float) $data->aggregate;
             }
 
         } catch (\Exception $e) {
-            \Log::error("Graph Data Error: " . $e->getMessage());
+            \Log::error(
+                'Graph Data Error: '.$e->getMessage()
+            );
         }
 
-        // Recent invoices
+        /*
+        |--------------------------------------------------------------------------
+        | RECENT INVOICES
+        |--------------------------------------------------------------------------
+        */
         $recentInvoices = Invoice::where('company_id', $company->id)
             ->latest()
             ->take(5)
             ->get();
 
-        $currentSecret = $company->stripe_secret_key ?? env('STRIPE_SECRET');
+        /*
+        |--------------------------------------------------------------------------
+        | CUSTOMER COUNTS
+        |--------------------------------------------------------------------------
+        */
+        $customerCount = Customer::where(
+            'company_id',
+            $company->id
+        )->count();
 
-        $stripeStatus = str_contains($currentSecret, 'sk_live')
-            ? 'LIVE'
-            : 'TEST';
+        /*
+        |--------------------------------------------------------------------------
+        | STRIPE STATUS
+        |--------------------------------------------------------------------------
+        */
+        $currentSecret =
+            $company->stripe_secret_key ??
+            $company->client_stripe_secret ??
+            null;
 
+        if (!$currentSecret) {
+            $stripeStatus = 'NOT CONNECTED';
+        } elseif (str_contains($currentSecret, 'sk_live')) {
+            $stripeStatus = 'LIVE';
+        } else {
+            $stripeStatus = 'TEST';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | LOAD VIEW
+        |--------------------------------------------------------------------------
+        */
         return view(
             'dashboard',
             compact(
@@ -112,7 +281,14 @@ class DashboardController extends Controller
                 'recentInvoices',
                 'company',
                 'stripeStatus',
-                'greeting'
+                'greeting',
+                'role',
+                'canCustomers',
+                'canQuotes',
+                'canInvoices',
+                'canUsers',
+                'canBrand',
+                'customerCount'
             )
         );
     }

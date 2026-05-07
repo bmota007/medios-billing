@@ -12,17 +12,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
 
-->withMiddleware(function (Middleware $middleware) {
-    $middleware->alias([
-        'check.subscription' => \App\Http\Middleware\CheckSubscription::class,
-        'superadmin' => \App\Http\Middleware\AdminMiddleware::class,
-    ]);
+    ->withMiddleware(function (Middleware $middleware) {
 
-    // 🔥 THIS IS THE FIX (disable CSRF for Stripe)
-    $middleware->validateCsrfTokens(except: [
-        'stripe/webhook',
-    ]);
-})
+        $middleware->alias([
+            'check.subscription'     => \App\Http\Middleware\CheckSubscription::class,
+            'superadmin'             => \App\Http\Middleware\AdminMiddleware::class,
+'role.access' => \App\Http\Middleware\RoleAccess::class,
+        ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'stripe/webhook',
+        ]);
+    })
 
     ->withExceptions(function (Exceptions $exceptions) {
         //

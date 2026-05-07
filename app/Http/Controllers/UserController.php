@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Mail\WelcomeStaffMail;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -15,29 +15,29 @@ class UserController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
-    | PLAN LIMIT ENGINE
+    | PLAN LIMITS
     |--------------------------------------------------------------------------
     */
     private function getPlanLimit($company)
     {
         $plan = strtolower($company->plan_name ?? $company->plan ?? 'starter');
 
-        if ($plan === 'pro' || $plan === 'premium') {
-            return 999999; // unlimited
+        if (in_array($plan, ['pro', 'premium'])) {
+            return 999999;
         }
 
         if ($plan === 'growth') {
             return 5;
         }
 
-        return 1; // starter
+        return 1;
     }
 
     private function getPlanName($company)
     {
         $plan = strtolower($company->plan_name ?? $company->plan ?? 'starter');
 
-        if ($plan === 'premium') {
+        if (in_array($plan, ['premium'])) {
             return 'Pro';
         }
 
@@ -46,59 +46,76 @@ class UserController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | TEAM MEMBERS PAGE
+    | Allowed Roles
+    |--------------------------------------------------------------------------
+    */
+    private function allowedRoles()
+    {
+        return [
+            'owner',
+            'regional_director',
+            'sales_director',
+            'manager',
+            'accounting',
+            'sales',
+            'support',
+            'staff',
+            'viewer',
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Team Users Page
     |--------------------------------------------------------------------------
     */
     public function index()
     {
-        $user = Auth::user();
+        $auth = Auth::user();
 
-        if (!$user->company_id) {
+        if (!$auth->company_id) {
             return redirect()->route('admin.dashboard')
-                ->with('error', 'Super Admin cannot access company employees.');
+                ->with('error', 'Super Admin cannot access company team users.');
         }
 
-        $company = $user->company;
+        $company = $auth->company;
 
-        $users = User::where('company_id', $user->company_id)
+        $users = User::where('company_id', $auth->company_id)
             ->latest()
             ->get();
 
         $userCount = $users->count();
         $planLimit = $this->getPlanLimit($company);
         $planName  = $this->getPlanName($company);
+        $roles     = $this->allowedRoles();
 
         return view('company.users.index', compact(
             'users',
             'company',
             'userCount',
             'planLimit',
-            'planName'
+            'planName',
+            'roles'
         ));
     }
 
     /*
     |--------------------------------------------------------------------------
-    | CREATE USER
+    | Store User
     |--------------------------------------------------------------------------
     */
     public function store(Request $request)
     {
         try {
-            $authUser = Auth::user();
+            $auth = Auth::user();
 
-            if (!$authUser->company_id) {
+            if (!$auth->company_id) {
                 return back()->with('error', 'No company assigned.');
             }
 
-            $company = $authUser->company;
+            $company = $auth->company;
 
-            /*
-            |--------------------------------------------------------------------------
-            | PLAN LIMIT CHECK
-            |--------------------------------------------------------------------------
-            */
-            $currentUsers = User::where('company_id', $authUser->company_id)->count();
+            $currentUsers = User::where('company_id', $auth->company_id)->count();
             $planLimit    = $this->getPlanLimit($company);
             $planName     = $this->getPlanName($company);
 
@@ -107,90 +124,74 @@ class UserController extends Controller
                 if ($planName === 'Starter') {
                     return back()->with(
                         'error',
-                        'Starter plan allows 1 user only. Upgrade to Growth to add team members.'
+                        'Starter plan allows 1 user only. Upgrade to Growth.'
                     );
                 }
 
                 if ($planName === 'Growth') {
                     return back()->with(
                         'error',
-                        'Growth plan allows up to 5 users. Upgrade to Pro for unlimited users.'
+                        'Growth allows 5 users. Upgrade to Pro.'
                     );
                 }
 
                 return back()->with('error', 'User limit reached.');
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | VALIDATION
-            |--------------------------------------------------------------------------
-            */
             $request->validate([
                 'name'     => 'required|string|max:255',
                 'email'    => 'required|email|unique:users,email',
                 'password' => 'required|min:8',
+                'role'     => 'required|string',
             ]);
 
-            $role = $request->input('role', 'staff');
+            $role = strtolower($request->role);
 
-            /*
-            |--------------------------------------------------------------------------
-            | CREATE USER
-            |--------------------------------------------------------------------------
-            */
+            if (!in_array($role, $this->allowedRoles())) {
+                $role = 'staff';
+            }
+
             $user = User::create([
                 'name'                  => $request->name,
                 'email'                 => $request->email,
                 'password'              => Hash::make($request->password),
-                'company_id'            => $authUser->company_id,
+                'company_id'            => $auth->company_id,
                 'role'                  => $role,
-                'is_admin'              => ($role === 'admin' ? 1 : 0),
+                'is_admin'              => in_array($role, [
+                    'owner',
+                    'regional_director',
+                    'sales_director',
+                    'manager'
+                ]),
                 'needs_password_change' => true,
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | SEND WELCOME EMAIL
-            |--------------------------------------------------------------------------
-            */
             $details = [
-                'name'          => $request->name,
-                'email'         => $request->email,
+                'name'          => $user->name,
+                'email'         => $user->email,
                 'temp_password' => $request->password,
-                'company'       => $company->name ?? 'Medios Billing',
+                'company'       => $company->name,
             ];
 
             try {
                 Mail::to($user->email)->send(new WelcomeStaffMail($details));
-            } catch (\Exception $mailError) {
-                Log::error("Mail failed: " . $mailError->getMessage());
+            } catch (\Exception $e) {
+                Log::error($e->getMessage());
             }
 
             return redirect()
-                ->route('users.index')
+                ->route('company.users')
                 ->with('success', 'Team member created successfully.');
 
         } catch (\Exception $e) {
 
-            Log::error("User Creation Error: " . $e->getMessage());
-
-            if ($e instanceof \Illuminate\Validation\ValidationException) {
-                $errors = implode(' ', \Illuminate\Support\Arr::flatten($e->errors()));
-
-                return back()->with(
-                    'error',
-                    'Validation Failed: ' . $errors
-                );
-            }
-
-            return back()->with('error', 'Error: ' . $e->getMessage());
+            return back()->with('error', $e->getMessage());
         }
     }
 
     /*
     |--------------------------------------------------------------------------
-    | RESET PASSWORD
+    | Reset Password
     |--------------------------------------------------------------------------
     */
     public function resetPassword($id)
@@ -203,36 +204,18 @@ class UserController extends Controller
 
         $user->update([
             'password'              => Hash::make($newPassword),
-            'needs_password_change' => true
+            'needs_password_change' => true,
         ]);
 
-        $details = [
-            'name'          => $user->name,
-            'email'         => $user->email,
-            'temp_password' => $newPassword,
-            'company'       => Auth::user()->company->name
-        ];
-
-        try {
-            Mail::to($user->email)->send(new WelcomeStaffMail($details));
-
-            return back()->with(
-                'success',
-                'Password reset! New credentials emailed.'
-            );
-
-        } catch (\Exception $e) {
-
-            return back()->with(
-                'success',
-                'Password reset to: ' . $newPassword
-            );
-        }
+        return back()->with(
+            'success',
+            'Password reset. Temporary password: '.$newPassword
+        );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | DELETE USER
+    | Delete User
     |--------------------------------------------------------------------------
     */
     public function destroy($id)
@@ -242,7 +225,7 @@ class UserController extends Controller
             ->firstOrFail();
 
         if ($user->id === Auth::id()) {
-            return back()->with('error', 'You cannot delete yourself!');
+            return back()->with('error', 'You cannot delete yourself.');
         }
 
         $user->delete();

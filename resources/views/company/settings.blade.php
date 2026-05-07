@@ -1,4 +1,3 @@
-id="clean_pro_ui" variant="standard"
 @extends('layouts.app')
 
 @section('content')
@@ -10,139 +9,176 @@ id="clean_pro_ui" variant="standard"
         <p>Manage branding, payments, contract, and system configuration.</p>
     </div>
 
-    <form method="POST" enctype="multipart/form-data">
-        @csrf
+<form method="POST" action="{{ route('company.branding.update') }}" enctype="multipart/form-data">
+@csrf
 
-        <div class="grid">
+<div class="grid">
 
-            {{-- LEFT --}}
-            <div>
+{{-- LEFT --}}
+<div>
 
-                {{-- BUSINESS --}}
-                <div class="card">
-                    <h3>Business Profile</h3>
+{{-- BUSINESS --}}
+<div class="card">
+<h3>Business Profile</h3>
 
-                    <input type="text" name="name" value="{{ $company->name }}" placeholder="Company Name">
-                    <input type="email" name="email" value="{{ $company->email }}" placeholder="Company Email">
-                    <input type="text" name="phone" value="{{ $company->phone }}" placeholder="Phone">
-                    <input type="text" name="address" value="{{ $company->address }}" placeholder="Address">
-                    <input type="text" name="website" value="{{ $company->website }}" placeholder="Website">
+<input type="text" name="name" value="{{ $company->name }}" placeholder="Company Name">
+<input type="email" name="email" value="{{ $company->email }}" placeholder="Company Email">
+<input type="text" name="phone" value="{{ $company->phone }}" placeholder="Phone">
+<input type="text" name="address" value="{{ $company->address }}" placeholder="Address">
+<input type="text" name="website" value="{{ $company->website }}" placeholder="Website">
 
-                    <div class="color-row">
-                        <input type="text" name="primary_color" value="{{ $company->primary_color }}">
-                        <div class="color-preview" style="background: {{ $company->primary_color }}"></div>
-                    </div>
-                </div>
+<div class="color-row">
+<input type="text" name="primary_color" value="{{ $company->primary_color }}">
+<div class="color-preview" style="background: {{ $company->primary_color }}"></div>
+</div>
+</div>
 
-                {{-- STRIPE --}}
-                <div class="card highlight">
-                    <h3>Stripe Payment Integration</h3>
+{{-- STRIPE --}}
+<div class="card highlight">
+<h3>Stripe Payment Integration</h3>
 
-                    <select name="stripe_mode">
-                        <option value="live" {{ $company->stripe_mode=='live'?'selected':'' }}>🚀 Live Mode</option>
-                        <option value="test" {{ $company->stripe_mode=='test'?'selected':'' }}>🧪 Test Mode</option>
-                    </select>
+<select name="stripe_mode">
+<option value="live" {{ $company->stripe_mode=='live'?'selected':'' }}>🚀 Live Mode</option>
+<option value="test" {{ $company->stripe_mode=='test'?'selected':'' }}>🧪 Test Mode</option>
+</select>
 
-                    <div class="two-col">
-                        <input type="text" name="stripe_publishable_key" value="{{ $company->stripe_publishable_key }}" placeholder="Live Publishable Key">
-                        <input type="password" name="stripe_secret_key" placeholder="Live Secret Key">
-                    </div>
+<div class="two-col">
+<input type="text" name="stripe_publishable_key" value="{{ $company->stripe_publishable_key }}" placeholder="Live Publishable Key">
+<input type="password" name="stripe_secret_key" placeholder="Live Secret Key">
+</div>
 
-                    <div class="two-col">
-                        <input type="text" name="stripe_test_publishable_key" value="{{ $company->stripe_test_publishable_key }}" placeholder="Test Publishable Key">
-                        <input type="password" name="stripe_test_secret_key" placeholder="Test Secret Key">
-                    </div>
+<div class="two-col">
+<input type="text" name="stripe_test_publishable_key" value="{{ $company->stripe_test_publishable_key }}" placeholder="Test Publishable Key">
+<input type="password" name="stripe_test_secret_key" placeholder="Test Secret Key">
+</div>
 
-                    <input type="password" name="stripe_webhook_secret" placeholder="Stripe Webhook Secret (WHSEC)">
-                </div>
+<input type="password" name="stripe_webhook_secret" placeholder="Stripe Webhook Secret (WHSEC)">
+</div>
 
-                {{-- CONTRACT --}}
-                <div class="card">
-                    <h3>Contract Template</h3>
+{{-- CONTRACTS --}}
+<div class="card">
+<h3>Contract Templates</h3>
 
-                    @if($company->contract_template_path)
-                        <a href="{{ asset('storage/'.$company->contract_template_path) }}" target="_blank" class="btn-small">
-                            View Contract
-                        </a>
-                    @endif
+@for($i = 1; $i <= 4; $i++)
+@php
+$nameField = "contract_{$i}_name";
+$pathField = "contract_{$i}_path";
+@endphp
 
-                    <input type="file" name="contract_template">
-                </div>
+<div class="mt-3">
 
-                {{-- PAYMENTS --}}
-                <div class="card">
-                    <h3>Payment Methods</h3>
+<label>Contract {{ $i }} Name</label>
 
-                    <div class="toggle-grid">
-                        @foreach([
-                            'card'=>'Card',
-                            'cash'=>'Cash',
-                            'venmo'=>'Venmo',
-                            'check'=>'Check',
-                            'zelle'=>'Zelle'
-                        ] as $key=>$label)
+<input type="text"
+name="contract_{{ $i }}_name"
+value="{{ $company->$nameField ?? '' }}"
+placeholder="Contract {{ $i }} Name">
 
-                        <label class="toggle">
-                            <input type="checkbox" name="accept_{{ $key }}" {{ $company->{'accept_'.$key} ? 'checked':'' }}>
-                            <span>{{ $label }}</span>
-                        </label>
+@if(!empty($company->$pathField))
+<a href="{{ asset('storage/'.$company->$pathField) }}"
+target="_blank"
+class="btn-small"
+style="display:block;margin-bottom:6px;">
+View Contract {{ $i }}
+</a>
+@endif
 
-                        @endforeach
-                    </div>
-                </div>
-
-                <button class="btn-save">Save Settings</button>
-
-            </div>
-
-            {{-- RIGHT --}}
-            <div>
-
-                {{-- PASSWORD --}}
-                <div class="card">
-                    <h3>Change Password</h3>
-
-                    <input type="password" name="password" placeholder="New Password">
-                    <input type="password" name="password_confirmation" placeholder="Confirm Password">
-
-                    <button class="btn-yellow">Update Password</button>
-                </div>
-
-                {{-- LOGO --}}
-                <div class="card center">
-                    <h3>Brand Logo</h3>
-
-                    @if($company->logo_path)
-                        <img src="{{ asset('storage/'.$company->logo_path) }}" class="logo-preview">
-                    @endif
-
-                    <input type="file" name="logo">
-                </div>
-
-                {{-- SMTP --}}
-                <div class="card highlight-blue">
-                    <h3>SMTP Email Setup</h3>
-
-                    <input type="text" name="smtp_host" value="{{ $company->smtp_host }}" placeholder="SMTP Host">
-                    <input type="text" name="smtp_port" value="{{ $company->smtp_port }}" placeholder="Port">
-                    <input type="text" name="smtp_user" value="{{ $company->smtp_user }}" placeholder="Email Username">
-                    <input type="password" name="smtp_pass" placeholder="Email Password">
-                    <input type="text" name="smtp_from" value="{{ $company->smtp_from }}" placeholder="From Email">
-
-                    <small>This allows each business to send invoices from their own email</small>
-
-                    <button type="submit" formaction="{{ route('smtp.test') }}" class="btn-test">
-                        Send Test Email
-                    </button>
-                </div>
-
-            </div>
-
-        </div>
-
-    </form>
+<input type="file" name="contract_{{ $i }}_file">
 
 </div>
+
+@endfor
+
+</div>
+
+{{-- PAYMENTS --}}
+<div class="card">
+<h3>Payment Methods</h3>
+
+<div class="toggle-grid">
+@foreach([
+'card'=>'Card',
+'cash'=>'Cash',
+'venmo'=>'Venmo',
+'check'=>'Check',
+'zelle'=>'Zelle'
+] as $key=>$label)
+
+<label class="toggle">
+<input type="checkbox" name="accept_{{ $key }}" {{ $company->{'accept_'.$key} ? 'checked':'' }}>
+<span>{{ $label }}</span>
+</label>
+
+@endforeach
+</div>
+</div>
+
+<button class="btn-save">Save Settings</button>
+
+</div>
+
+{{-- RIGHT --}}
+<div>
+
+{{-- PASSWORD --}}
+<div class="card">
+<h3>Change Password</h3>
+
+<input type="password" name="password" placeholder="New Password">
+<input type="password" name="password_confirmation" placeholder="Confirm Password">
+
+<button class="btn-yellow">Update Password</button>
+</div>
+
+{{-- LOGO --}}
+<div class="card center">
+<h3>Brand Logo</h3>
+
+@if($company->logo_path)
+<img src="{{ asset('storage/'.$company->logo_path) }}" class="logo-preview">
+@endif
+
+<input type="file" name="logo">
+</div>
+
+{{-- SMTP --}}
+<div class="card highlight-blue">
+<h3>SMTP Email Setup</h3>
+
+<input type="text" name="smtp_host" value="{{ $company->smtp_host }}" placeholder="SMTP Host">
+<input type="text" name="smtp_port" value="{{ $company->smtp_port }}" placeholder="Port">
+<input type="text" name="smtp_user" value="{{ $company->smtp_user }}" placeholder="Email Username">
+<input type="password" name="smtp_pass" placeholder="Email Password">
+<input type="text" name="smtp_from" value="{{ $company->smtp_from }}" placeholder="From Email">
+
+<small>This allows each business to send invoices from their own email</small>
+
+<button type="button" onclick="testSMTP()" class="btn-test">
+Send Test Email
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+</form>
+
+</div>
+
+<script>
+function testSMTP() {
+fetch("{{ route('smtp.test') }}", {
+method: "POST",
+headers: {
+'X-CSRF-TOKEN': document.querySelector('input[name=_token]').value
+}
+})
+.then(() => alert('SMTP test sent'))
+.catch(() => alert('Error sending test'));
+}
+</script>
 
 <style>
 

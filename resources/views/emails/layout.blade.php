@@ -15,7 +15,7 @@
     <td style="background:#0ea5e9;padding:20px;text-align:center;color:white;">
 
         @if(!empty($company->logo ?? null))
-            <img src="{{ asset('storage/' . $company->logo) }}" 
+            <img src="{{ asset('storage/'.$company->logo) }}" width="180">logo) }}" 
                  style="max-height:60px;margin-bottom:10px;">
         @endif
 

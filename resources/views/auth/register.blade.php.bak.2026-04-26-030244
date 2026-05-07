@@ -1,0 +1,375 @@
+@extends('layouts.guest')
+
+@section('content')
+
+<div class="register-shell">
+
+    <div class="register-grid">
+
+        {{-- LEFT SIDE --}}
+        <div class="left-side">
+
+            <div class="brand-badge">MEDIOS BILLING • 7 DAY FREE TRIAL</div>
+
+            <h1>
+                Start Getting Paid Faster.
+            </h1>
+
+            <p class="hero-text">
+                Invoices, quotes, contracts, customer management and payments —
+                built for real service businesses that want to grow.
+            </p>
+
+            <div class="trust-list">
+                <div>✔ No contracts</div>
+                <div>✔ Cancel anytime</div>
+                <div>✔ Secure Stripe checkout</div>
+                <div>✔ Setup in minutes</div>
+                <div>✔ Trusted business workflow</div>
+            </div>
+
+            <div class="industry-box">
+                <span>Cleaning</span>
+                <span>Painting</span>
+                <span>Roofing</span>
+                <span>Contractors</span>
+                <span>Agencies</span>
+                <span>Landscaping</span>
+            </div>
+
+        </div>
+
+        {{-- RIGHT SIDE --}}
+        <div class="right-side glass-card">
+
+            <div class="text-center mb-6">
+                <h2 class="form-title">Create Your Account</h2>
+                <p class="form-sub">
+                    No charge today. Start your free trial now.
+                </p>
+            </div>
+
+            <form action="{{ route('register') }}" method="POST" class="space-y-5">
+                @csrf
+
+                @if ($errors->any())
+                    <div class="error-box">
+                        <ul>
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                <input type="hidden" name="plan" id="planInput" value="starter">
+
+                {{-- PLAN --}}
+                <div id="planBanner" class="plan-banner">
+                    <div>
+                        <div class="mini-label">Selected Plan</div>
+                        <div id="planName" class="plan-name">Starter</div>
+                    </div>
+
+                    <div class="text-right">
+                        <div id="planPrice" class="plan-price">$49</div>
+                        <small>/month</small>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="field-label">Company Name</label>
+                    <input type="text" name="company_name" required class="custom-input" placeholder="Pronto Painting LLC">
+                </div>
+
+                <div>
+                    <label class="field-label">Your Full Name</label>
+                    <input type="text" name="name" required class="custom-input" placeholder="John Doe">
+                </div>
+
+                <div>
+                    <label class="field-label">Business Email</label>
+                    <input type="email" name="email" required class="custom-input" placeholder="owner@company.com">
+                </div>
+
+                <div>
+                    <label class="field-label">Password</label>
+                    <input type="password" name="password" required class="custom-input">
+                </div>
+
+                <div>
+                    <label class="field-label">Confirm Password</label>
+                    <input type="password" name="password_confirmation" required class="custom-input">
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    Start Free Trial →
+                </button>
+
+                <div class="secure-note">
+                    🔒 Secure Checkout • Card Required After Trial Begins
+                </div>
+
+                <div class="signin-link">
+                    Already have an account?
+                    <a href="{{ route('login') }}">Sign In</a>
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+
+    const params = new URLSearchParams(window.location.search);
+    const selected = (params.get('plan') || 'starter').toLowerCase();
+
+    const plans = {
+        starter:{
+            name:'Starter',
+            price:'$49',
+            color:'#ffffff',
+            bg:'rgba(255,255,255,.05)'
+        },
+        growth:{
+            name:'Growth',
+            price:'$99',
+            color:'#38bdf8',
+            bg:'rgba(56,189,248,.12)'
+        },
+        premium:{
+            name:'Premium',
+            price:'$199',
+            color:'#a855f7',
+            bg:'rgba(168,85,247,.14)'
+        }
+    };
+
+    const data = plans[selected] || plans.starter;
+
+    document.getElementById('planInput').value = selected;
+    document.getElementById('planName').innerText = data.name;
+    document.getElementById('planPrice').innerText = data.price;
+
+    const banner = document.getElementById('planBanner');
+    banner.style.background = data.bg;
+    banner.style.borderColor = data.color + '50';
+
+    document.getElementById('planPrice').style.color = data.color;
+});
+</script>
+
+<style>
+
+body{
+background:
+radial-gradient(circle at top left, rgba(37,99,235,.10), transparent 28%),
+radial-gradient(circle at bottom right, rgba(168,85,247,.10), transparent 28%),
+#020617;
+}
+
+.register-shell{
+min-height:100vh;
+padding:40px 24px;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+
+.register-grid{
+width:100%;
+max-width:1400px;
+display:grid;
+grid-template-columns:1.1fr .9fr;
+gap:38px;
+align-items:center;
+}
+
+.left-side h1{
+font-size:68px;
+line-height:1.05;
+font-weight:900;
+color:#fff;
+margin:18px 0;
+}
+
+.hero-text{
+font-size:22px;
+line-height:1.6;
+color:#94a3b8;
+max-width:720px;
+}
+
+.brand-badge{
+display:inline-block;
+padding:10px 18px;
+border-radius:999px;
+background:rgba(37,99,235,.16);
+color:#93c5fd;
+font-weight:800;
+font-size:13px;
+}
+
+.trust-list{
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:12px;
+margin-top:28px;
+color:#e2e8f0;
+font-weight:700;
+}
+
+.industry-box{
+display:flex;
+flex-wrap:wrap;
+gap:10px;
+margin-top:28px;
+}
+
+.industry-box span{
+padding:10px 14px;
+border-radius:999px;
+background:#081226;
+border:1px solid rgba(255,255,255,.06);
+color:#cbd5e1;
+font-size:14px;
+}
+
+.glass-card{
+background:rgba(15,23,42,.78);
+border:1px solid rgba(255,255,255,.08);
+backdrop-filter:blur(20px);
+border-radius:26px;
+padding:38px;
+box-shadow:0 25px 70px rgba(0,0,0,.45);
+}
+
+.form-title{
+font-size:38px;
+font-weight:900;
+color:#fff;
+}
+
+.form-sub{
+color:#94a3b8;
+margin-top:8px;
+}
+
+.plan-banner{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:18px 20px;
+border-radius:18px;
+border:1px solid rgba(255,255,255,.08);
+margin-bottom:10px;
+}
+
+.mini-label,.field-label{
+font-size:12px;
+text-transform:uppercase;
+letter-spacing:1px;
+font-weight:800;
+color:#94a3b8;
+margin-bottom:8px;
+display:block;
+}
+
+.plan-name{
+font-size:28px;
+font-weight:900;
+color:#fff;
+}
+
+.plan-price{
+font-size:42px;
+font-weight:900;
+}
+
+.custom-input{
+width:100%;
+padding:14px 16px;
+border-radius:14px;
+border:1px solid rgba(255,255,255,.08);
+background:rgba(255,255,255,.03);
+color:#fff;
+outline:none;
+}
+
+.custom-input:focus{
+border-color:#38bdf8;
+box-shadow:0 0 0 4px rgba(56,189,248,.12);
+}
+
+.submit-btn{
+width:100%;
+padding:16px;
+border:none;
+border-radius:16px;
+font-size:18px;
+font-weight:900;
+color:#fff;
+background:linear-gradient(135deg,#2563eb,#7c3aed);
+cursor:pointer;
+margin-top:10px;
+}
+
+.secure-note{
+text-align:center;
+font-size:13px;
+color:#94a3b8;
+margin-top:14px;
+}
+
+.signin-link{
+text-align:center;
+margin-top:18px;
+color:#94a3b8;
+}
+
+.signin-link a{
+color:#38bdf8;
+font-weight:800;
+text-decoration:none;
+}
+
+.error-box{
+background:rgba(239,68,68,.12);
+border:1px solid rgba(239,68,68,.30);
+padding:14px;
+border-radius:14px;
+color:#fecaca;
+}
+
+@media(max-width:1100px){
+.register-grid{
+grid-template-columns:1fr;
+}
+.left-side h1{
+font-size:52px;
+}
+}
+
+@media(max-width:768px){
+.left-side h1{
+font-size:40px;
+}
+.hero-text{
+font-size:18px;
+}
+.trust-list{
+grid-template-columns:1fr;
+}
+.glass-card{
+padding:24px;
+}
+}
+
+</style>
+
+@endsection
