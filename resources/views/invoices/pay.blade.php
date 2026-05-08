@@ -98,25 +98,21 @@ h1 {
         ${{ number_format($invoice->total, 2) }}
     </div>
 
-    <!-- STRIPE -->
-    <div class="card" onclick="toggle('stripe')">
-        <div class="card-title">💳 Pay with Card</div>
-        <div class="card-desc">Secure Stripe Checkout</div>
-    </div>
+<!-- STRIPE -->
 
-    <div id="stripe" class="hidden">
-        <!-- ✅ CLEAN WORKING STRIPE BUTTON -->
-        <form action="{{ url('/invoice/checkout/'.$invoice->invoice_no) }}" method="GET">
-            <button class="btn btn-stripe">Pay Now</button>
-        </form>
+<a href="{{ url('/invoice/checkout/'.$invoice->invoice_no) }}"
+   class="btn btn-stripe"
+   style="
+      display:block;
+      text-decoration:none;
+      margin-bottom:20px;
+      padding:25px;
+      font-size:22px;
+   ">
 
-        <!-- 🔥 OLD BROKEN BLOCK (HIDDEN - NOT DELETED) -->
-        <div style="display:none;">
-            @csrf
-            <input type="hidden" name="payment_method" value="card">
-            <button class="btn btn-stripe">Pay Now</button>
-        </div>
-    </div>
+    💳 PAY WITH CARD
+
+</a>
 
     <!-- VENMO -->
     @if($invoice->company->accept_venmo && $invoice->company->venmo_value)

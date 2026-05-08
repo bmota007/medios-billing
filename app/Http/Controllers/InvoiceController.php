@@ -111,20 +111,20 @@ class InvoiceController extends Controller
                 }
             );
 
-            return back()->with(
-                'success',
-                'Payment successful!'
-            );
+return back()->with(
+    'success',
+    'Payment successful!'
+);
 
-        } catch (\Exception $e) {
+} catch (\Exception $e) {
 
-            return back()->with(
-                'error',
-                $e->getMessage()
-            );
-        }
-    }
+    return back()->with(
+        'error',
+        $e->getMessage()
+    );
 
+}
+}
     public function publicView($invoice_no)
     {
         $invoice = Invoice::where('invoice_no', $invoice_no)
@@ -193,10 +193,8 @@ class InvoiceController extends Controller
 
         } catch (\Exception $e) {
 
-            return back()->with(
-                'error',
-                $e->getMessage()
-            );
+            dd($e->getMessage());
+
         }
     }
 
@@ -251,64 +249,78 @@ class InvoiceController extends Controller
         );
     }
 
-    // ✅ CREATE & SEND INVOICE
-    public function send(Request $request)
-    {
-        $company = auth()->user()->company;
+// ✅ CREATE & SEND INVOICE
+public function send(Request $request)
+{
+    $company = auth()->user()->company;
 
-        // ✅ Create customer if not exists
-        $customer = \App\Models\Customer::firstOrCreate(
-            [
-                'email' => $request->customer_email,
-                'company_id' => $company->id
-            ],
-            [
-                'name' => $request->customer_name,
-                'phone' => $request->customer_phone
-            ]
-        );
+    // ✅ SAFE CUSTOMER CREATION
+    $customer = null;
 
-        // ✅ Build invoice items
-        $items = [];
+    if (!empty($request->customer_email)) {
 
-        $subtotal = 0;
+$customer = \App\Models\Customer::firstOrCreate(
+    [
+        'email' => $request->customer_email,
+    ],
+    [
+        'name' => $request->customer_name ?? 'Customer',
 
-        foreach ($request->items as $item) {
+        'phone' => $request->customer_phone,
 
-            $qty = (float) ($item['qty'] ?? 0);
+        'street_address' =>
+            $request->street_address
+            ?? 'Not Provided',
 
-            $price = (float) ($item['price'] ?? 0);
+        'city_state_zip' =>
+            $request->city_state_zip
+            ?? 'Not Provided'
+    ]
+);
+    }
 
-            $lineTotal = $qty * $price;
+    // ✅ Build invoice items
+    $items = [];
 
-            $subtotal += $lineTotal;
+    $subtotal = 0;
 
-            $items[] = [
-                'desc' => $item['description'] ?? '',
-                'qty' => $qty,
-                'price' => $price,
-                'line_total' => $lineTotal
-            ];
-        }
+    foreach ($request->items as $item) {
 
-        $taxPercent = (float) (
-            $request->tax_percent ?? 0
-        );
+        $qty = (float) ($item['qty'] ?? 0);
 
-        $taxAmount = ($subtotal * $taxPercent) / 100;
+        $price = (float) ($item['price'] ?? 0);
 
-        $grandTotal = $subtotal + $taxAmount;
+        $lineTotal = $qty * $price;
 
-        // ✅ Create invoice
-        $invoice = new Invoice();
+        $subtotal += $lineTotal;
 
-        $invoice->company_id = $company->id;
+        $items[] = [
+            'desc' => $item['description'] ?? '',
+            'qty' => $qty,
+            'price' => $price,
+            'line_total' => $lineTotal
+        ];
+    }
 
-        $invoice->customer_id = $customer->id;
+    $taxPercent = (float) (
+        $request->tax_percent ?? 0
+    );
 
-        $invoice->invoice_no = 'INV-' . time();
+    $taxAmount = ($subtotal * $taxPercent) / 100;
 
-        // ✅ LEGACY COLUMN SUPPORT
+    $grandTotal = $subtotal + $taxAmount;
+
+    // ✅ Create invoice
+    $invoice = new Invoice();
+
+    $invoice->company_id = $company->id;
+
+    // ✅ SAFE CUSTOMER ID
+    $invoice->customer_id = $customer?->id;
+
+    $invoice->invoice_no = 'INV-' . time();
+
+    // ✅ LEGACY COLUMN SUPPORT
         $invoice->invoice_number = $invoice->invoice_no;
 
         $invoice->invoice_date = $request->invoice_date;
@@ -322,6 +334,36 @@ class InvoiceController extends Controller
         $invoice->tax_amount = $taxAmount;
 
         $invoice->total = $grandTotal;
+
+// ✅ SAVE CUSTOMER SNAPSHOT
+$invoice->customer_name = $request->customer_name;
+$invoice->customer_email = $request->customer_email;
+$invoice->customer_phone = $request->customer_phone;
+
+$invoice->street_address =
+    $request->street_address;
+
+$invoice->city_state_zip =
+    $request->city_state_zip;
+
+// ✅ SAVE BILLING VALUES
+$invoice->subtotal_amount =
+    $request->subtotal_amount ?? $subtotal;
+
+$invoice->deposit_percent =
+    $request->deposit_percent ?? 0;
+
+$invoice->deposit_amount =
+    $request->deposit_amount ?? 0;
+
+$invoice->remaining_balance =
+    $request->remaining_balance ?? 0;
+
+$invoice->remaining_due_date =
+    $request->remaining_due_date;
+
+$invoice->auto_charge_enabled =
+    $request->has('auto_charge_enabled');
 
         $invoice->items = json_encode($items);
 
