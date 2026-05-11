@@ -108,6 +108,51 @@
         text-align: center; 
         font-weight: 800; 
     }
+.payment-options{
+margin-top:22px;
+display:flex;
+flex-direction:column;
+gap:12px;
+}
+
+.radio-option{
+display:flex;
+align-items:flex-start;
+gap:12px;
+font-size:15px;
+color:#dbeafe;
+line-height:1.5;
+word-break:break-word;
+}
+
+.radio-option input{
+width:auto !important;
+margin-top:4px;
+flex-shrink:0;
+accent-color:#2563eb;
+}
+
+.radio-option span{
+flex:1;
+}
+
+.manual-text{
+margin-top:22px;
+margin-bottom:18px;
+}
+
+.manual-text strong{
+display:block;
+margin-bottom:8px;
+color:#cbd5e1;
+font-size:18px;
+}
+
+.manual-text p{
+font-size:13px;
+line-height:1.7;
+color:#64748b;
+}
     @endauth
 
 
@@ -264,6 +309,137 @@
         text-transform: uppercase; 
     }
     @endguest
+@media(max-width:768px){
+
+.mb-layout{
+grid-template-columns:1fr !important;
+}
+
+.mb-shell{
+padding:15px !important;
+overflow:hidden;
+}
+
+.mb-card{
+overflow:hidden;
+}
+
+div[style*="display:flex; gap:12px;"]{
+flex-direction:column !important;
+}
+
+div[style*="grid-template-columns:1fr 1fr"]{
+grid-template-columns:1fr !important;
+}
+
+
+.btn-header{
+width:100%;
+justify-content:center;
+}
+
+button{
+max-width:100%;
+}
+
+textarea,
+input{
+max-width:100%;
+box-sizing:border-box;
+}
+
+.guest-shell{
+
+margin:0;
+
+border-radius:0;
+
+}
+
+.guest-header{
+
+padding:25px;
+
+flex-direction:column;
+
+align-items:flex-start;
+
+gap:20px;
+
+overflow:hidden;
+
+}
+
+.guest-header div:last-child{
+
+text-align:left !important;
+
+}
+
+.guest-header div:last-child div:last-child{
+
+font-size:clamp(28px,8vw,42px) !important;
+
+word-break:break-word;
+
+line-height:1.1;
+
+}
+
+.guest-content{
+
+padding:20px;
+
+overflow:hidden;
+
+}
+
+.card-grid{
+
+grid-template-columns:1fr;
+
+}
+
+.financial-footer{
+
+grid-template-columns:1fr;
+
+gap:20px;
+
+}
+
+.guest-table{
+
+display:block;
+
+overflow-x:auto;
+
+white-space:nowrap;
+
+}
+
+.guest-table th,
+
+.guest-table td{
+
+font-size:14px;
+
+padding:12px;
+
+}
+
+.btn-pay,
+
+.btn-approve{
+
+font-size:18px;
+
+padding:20px;
+
+}
+
+}
+
 </style>
 @endpush
 
@@ -277,7 +453,31 @@
             <a href="{{ route('quotes.edit', $quote->id) }}" class="btn-header" style="background:rgba(255,255,255,0.15);"><i class="fa-solid fa-pen-to-square"></i> Edit Quote</a>
         </div>
         <div style="display:flex; gap:15px;">
-            <form action="{{ route('quotes.send', $quote->id) }}" method="POST">@csrf<button type="submit" class="btn-header" style="background:#f59e0b; color:#000;">Resend</button></form>
+<form action="{{ route('quotes.send', $quote->id) }}"
+      method="POST">
+    @csrf
+
+    <button type="submit"
+            class="btn-header"
+            style="background:#10b981; color:#fff;">
+
+        Send
+
+    </button>
+</form>
+
+<form action="{{ route('quotes.send', $quote->id) }}"
+      method="POST">
+    @csrf
+
+    <button type="submit"
+            class="btn-header"
+            style="background:#f59e0b; color:#000;">
+
+        Resend
+
+    </button>
+</form>
             <a href="{{ route('quotes.download', $quote->id) }}" class="btn-header" style="background:#6366f1;">Download PDF</a>
             <button onclick="window.print()" class="btn-header" style="background:#475569;">Print</button>
             <button onclick="navigator.clipboard.writeText('{{ $publicUrl }}'); alert('Link Copied!')" class="btn-header" style="background:#0ea5e9;">Copy Link</button>
@@ -332,11 +532,36 @@
             </div>
             <div class="mb-card">
                 <div class="p-label">Payment Flow</div>
-                <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
-                    <label style="display:flex; align-items:center; gap:12px; cursor:pointer;"><input type="radio" checked> Customer will pay themselves</label>
-                    <label style="display:flex; align-items:center; gap:12px; cursor:pointer;"><input type="radio"> I am charging customer manually</label>
-                </div>
-                <form action="{{ route('quotes.markPaid', $quote->id) }}" method="POST" id="paidForm">@csrf</form>
+<div class="payment-options">
+
+    <label class="radio-option">
+        <input type="radio" checked>
+        <span>Customer will pay themselves</span>
+    </label>
+
+    <label class="radio-option">
+        <input type="radio">
+        <span>I am charging customer manually</span>
+    </label>
+
+</div>
+
+<div class="manual-text">
+
+    <strong>Manual Charge Mode</strong>
+
+    <p>
+        Use these buttons if you are collecting payment
+        directly by phone, in person, or assisting the customer.
+    </p>
+
+</div>
+
+<form action="{{ route('quotes.markPaid', $quote->id) }}"
+      method="POST"
+      id="paidForm">
+    @csrf
+</form>
                 <form action="{{ route('quotes.markDeposit', $quote->id) }}" method="POST" id="depositForm">@csrf</form>
                 <div style="display:flex; gap:12px;"><button onclick="document.getElementById('paidForm').submit()" style="flex:1; background:transparent; border:1px solid #3b82f6; color:#fff; padding:12px; border-radius:12px; font-weight:800;">Pay Now</button><button onclick="document.getElementById('depositForm').submit()" style="flex:1; background:transparent; border:1px solid #f59e0b; color:#fff; padding:12px; border-radius:12px; font-weight:800;">Deposit</button></div>
             </div>
@@ -354,13 +579,35 @@
         <div style="text-align: right;"><div style="font-size: 12px; color: #38bdf8; font-weight: 900;">Project Proposal</div><div style="font-size: 42px; font-weight: 900;">#{{ $quote->quote_number }}</div></div>
     </div>
     <div class="guest-content">
-        <div class="card-grid">
-            <div class="info-card"><span class="info-label">Prepared For</span><div class="info-value">{{ $customer->name }}</div></div>
-            <div class="info-card"><span class="info-label">Quote Date</span><div class="info-value">{{ $fmtDate($quote->quote_date) }}</div></div>
-            <div class="info-card"><span class="info-label">Valid Until</span><div class="info-value">{{ $fmtDate($quote->expiry_date) }}</div></div>
-            <div class="info-card investment-card"><span class="info-label">Total Investment</span><div class="info-value">${{ number_format($total, 2) }}</div></div>
+<div class="card-grid">
+    <div class="info-card">
+        <span class="info-label">Prepared For</span>
+        <div class="info-value">{{ $customer->name }}</div>
+    </div>
+
+    <div class="info-card">
+        <span class="info-label">Quote Date</span>
+        <div class="info-value">{{ $fmtDate($quote->quote_date) }}</div>
+    </div>
+
+    <div class="info-card">
+        <span class="info-label">Valid Until</span>
+        <div class="info-value">{{ $fmtDate($quote->expiry_date) }}</div>
+    </div>
+
+    <div class="info-card investment-card">
+        <span class="info-label">Total Investment</span>
+
+        <div
+            class="info-value"
+            style="color:#ffffff !important;"
+        >
+            ${{ number_format($total, 2) }}
         </div>
-        <table class="guest-table">
+    </div>
+</div>
+
+<table class="guest-table">
             <thead><tr><th>Description</th><th width="80" style="text-align: center;">Qty</th><th width="150" style="text-align: right;">Line Total</th></tr></thead>
             <tbody>
                 @foreach($items as $item)
@@ -380,16 +627,58 @@
                 <div style="font-size:32px; font-weight:900; color:#0f172a;">Total: ${{ number_format($total, 2) }}</div>
             </div>
         </div>
-        <div style="margin-top: 40px;">
-            {{-- ✅ WAKE UP WIN: DETECTION OF NEW INVOICE --}}
-            @if($invoice)
-                <a href="{{ route('invoices.pay', $invoice->id) }}" class="btn-pay">💳 PAY WITH CARD (STRIPE)</a>
-            @elseif($quote->status !== 'approved' && $quote->status !== 'signed')
-                <form action="{{ route('quotes.approve', $quote->public_token) }}" method="POST">@csrf<button type="submit" class="btn-approve">✓ APPROVE PROPOSAL</button></form>
-            @else
-                <div style="background:#f0fdf4; color:#16a34a; padding:25px; border-radius:16px; text-align:center; font-weight:900; font-size:24px; border:2px solid #16a34a;">✓ SIGNED & APPROVED</div>
-            @endif
+<div style="margin-top: 40px;">
+
+    {{-- ✅ SHOW PAYMENT BUTTON IF INVOICE EXISTS --}}
+
+    @if($invoice)
+
+        <a href="{{ route('invoices.pay', $invoice->invoice_no) }}"
+           class="btn-pay">
+            💳 PAY WITH CARD (STRIPE)
+        </a>
+
+    {{-- ✅ SHOW APPROVE BUTTON ONLY BEFORE APPROVAL --}}
+
+    @elseif(
+        $quote->status !== 'approved' &&
+        $quote->status !== 'signed'
+    )
+
+        <form action="{{ route('quotes.approve', $quote->public_token) }}"
+              method="POST">
+
+            @csrf
+
+            <button type="submit"
+                    class="btn-approve">
+
+                ✓ APPROVE PROPOSAL
+
+            </button>
+
+        </form>
+
+    {{-- ✅ FALLBACK STATUS --}}
+
+    @else
+
+        <div style="
+            background:#f0fdf4;
+            color:#16a34a;
+            padding:25px;
+            border-radius:16px;
+            text-align:center;
+            font-weight:900;
+            font-size:24px;
+            border:2px solid #16a34a;
+        ">
+            ✓ SIGNED & APPROVED
         </div>
+
+    @endif
+
+</div>
     </div>
     <div class="guest-footer-bar">Questions? Contact {{ $company->name }} Support</div>
 </div>

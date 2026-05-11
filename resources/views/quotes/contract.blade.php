@@ -63,15 +63,65 @@
     <div class="contract-content">
         @if(session('success')) <div style="background:#f0fdf4; border:1px solid #16a34a; color:#16a34a; padding:20px; border-radius:12px; margin-bottom:30px; font-weight:700; text-align:center;">{{ session('success') }}</div> @endif
 
-        {{-- From/To Cards --}}
-        <div class="info-grid">
-            <div class="info-card"><span class="info-label">From Provider</span><div class="info-val">{{ $company->name }}</div></div>
-            <div class="info-card"><span class="info-label">Prepared For</span><div class="info-val">{{ $customer->name }}</div></div>
-            <div class="info-card"><span class="info-label">Agreement Date</span><div class="info-val">{{ $fmtDate($quote->quote_date) }}</div></div>
-            <div class="info-card" style="background:#0f172a;"><span class="info-label" style="color:#38bdf8;">Contract Value</span><div class="info-val" style="color:#fff; font-size:18px;">${{ number_format($total, 2) }}</div></div>
+{{-- From/To Cards --}}
+<div class="info-grid">
+
+    <div class="info-card">
+        <span class="info-label">
+            From Provider
+        </span>
+
+        <div class="info-val">
+            {{ $company->name }}
+        </div>
+    </div>
+
+    <div class="info-card">
+        <span class="info-label">
+            Prepared For
+        </span>
+
+        <div class="info-val">
+            {{ $customer->name }}
+        </div>
+    </div>
+
+    <div class="info-card">
+        <span class="info-label">
+            Agreement Date
+        </span>
+
+        <div class="info-val">
+            {{ $fmtDate($quote->quote_date) }}
+        </div>
+    </div>
+
+    {{-- ✅ DARK TOTAL CARD FIX --}}
+    <div class="info-card" style="background:#0f172a;">
+
+        <span
+            class="info-label"
+            style="color:#38bdf8;"
+        >
+            Contract Value
+        </span>
+
+        <div
+            class="info-val"
+            style="
+                color:#ffffff !important;
+                font-size:18px;
+                font-weight:800;
+            "
+        >
+            ${{ number_format($total, 2) }}
         </div>
 
-        {{-- Service Breakdown --}}
+    </div>
+
+</div>
+
+{{-- Service Breakdown --}}
         <h3 style="margin-bottom: 20px; font-weight: 900; color: #0f172a;">I. Project Scope & Pricing</h3>
         <table class="service-table">
             <thead>
@@ -80,9 +130,23 @@
             <tbody>
                 @foreach($items as $item)
                 <tr>
-                    <td><strong>{{ $item['service'] }}</strong>@if(!empty($item['description']))<div style="font-size:13px; color:#64748b; margin-top:5px;">{{ $item['description'] }}</div>@endif</td>
-                    <td style="text-align:center;">{{ $item['qty'] }}</td>
-                    <td style="text-align:right; font-weight:800;">${{ number_format(($item['qty'] ?? 0) * ($item['price'] ?? 0), 2) }}</td>
+<td style="color:#0f172a;">
+    <strong>{{ $item['service'] }}</strong>
+
+    @if(!empty($item['description']))
+        <div style="font-size:13px; color:#64748b; margin-top:5px;">
+            {{ $item['description'] }}
+        </div>
+    @endif
+</td>
+
+<td style="text-align:center; color:#0f172a; font-weight:700;">
+    {{ $item['qty'] }}
+</td>
+
+<td style="text-align:right; font-weight:800; color:#0f172a;">
+    ${{ number_format(($item['qty'] ?? 0) * ($item['price'] ?? 0), 2) }}
+</td>
                 </tr>
                 @endforeach
             </tbody>

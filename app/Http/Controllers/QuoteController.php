@@ -101,17 +101,74 @@ class QuoteController extends Controller
 
     public function preview($id) { $quote = Quote::findOrFail($id); $items = $this->normalizeItems($quote); return view('quotes.pro_preview', compact('quote', 'items')); }
     
-    // ✅ Route: quotes.public_view
-    public function publicView($token) { $quote = Quote::where('public_token', $token)->firstOrFail(); $items = $this->normalizeItems($quote); return view('quotes.pro_preview', compact('quote', 'items')); }
+// ✅ Route: quotes.public_view
+public function publicView($token)
+{
+    $quote = Quote::where(
+        'public_token',
+        $token
+    )->firstOrFail();
 
-    public function approve($token) {
-        $quote = Quote::where('public_token', $token)->firstOrFail();
-        $quote->status = 'approved';
-        $quote->accepted_at = now();
-        $quote->save();
-        if ($quote->contract_required && $quote->selected_contract_id) { return redirect()->route('quotes.contract', $quote->public_token); }
-        return back()->with('success', 'Proposal Approved!');
+    $items = $this->normalizeItems($quote);
+
+    return view(
+        'quotes.pro_preview',
+        compact('quote', 'items')
+    );
+}
+
+public function approve($token)
+{
+    $quote = Quote::where(
+        'public_token',
+        $token
+    )->firstOrFail();
+
+    $quote->status = 'approved';
+    $quote->accepted_at = now();
+
+    $quote->save();
+
+    // ✅ EMAIL TENANT THAT QUOTE WAS APPROVED
+
+    if (
+        $quote->company &&
+        $quote->company->email
+    ) {
+
+        Mail::send(
+            'emails.quote_approved',
+            ['quote' => $quote],
+            function ($m) use ($quote) {
+
+                $m->to($quote->company->email)
+                    ->subject(
+                        'Quote Approved - ' .
+                        $quote->quote_number
+                    );
+
+            }
+        );
     }
+
+    // ✅ CONTINUE TO CONTRACT IF REQUIRED
+
+    if (
+        $quote->contract_required &&
+        $quote->selected_contract_id
+    ) {
+
+        return redirect()->route(
+            'quotes.contract',
+            $quote->public_token
+        );
+    }
+
+    return back()->with(
+        'success',
+        'Proposal Approved!'
+    );
+}
 
     public function showContract($token) {
         $quote = Quote::where('public_token', $token)->with('customer', 'company')->firstOrFail();
@@ -146,25 +203,202 @@ class QuoteController extends Controller
             $invoice->customer_id = $quote->customer_id;
             $invoice->quote_id = $quote->id;
             $invoice->items = $quote->items;
-            $invoice->subtotal = $quote->subtotal;
-            $invoice->tax_percent = $quote->tax_percent;
-            $invoice->tax_amount = $taxAmount; 
-            $invoice->total = $quote->total;
-            $invoice->status = 'unpaid';
-            $invoice->save();
-            $quote->invoice_id = $invoice->id;
-            $quote->save();
-        }
-        return redirect()->route('quotes.public_view', $token)->with('success', 'Contract Signed Successfully!');
+$invoice->items = $quote->items;
+
+$invoice->subtotal = $quote->subtotal;
+
+$invoice->tax_percent = $quote->tax_percent;
+
+$invoice->tax_amount = $taxAmount;
+
+$invoice->total = $quote->total;
+
+// ✅ DEPOSIT LOGIC
+
+$depositAmount = 0;
+
+if (
+    $quote->deposit_type === 'percentage'
+) {
+
+    $depositAmount =
+        $quote->total *
+        (
+            ($quote->deposit_value ?? 0) / 100
+        );
+
+} elseif (
+    $quote->deposit_type === 'fixed'
+) {
+
+    $depositAmount =
+        $quote->deposit_value ?? 0;
+}
+
+$invoice->deposit_percent =
+    $quote->deposit_type === 'percentage'
+        ? $quote->deposit_value
+        : 0;
+
+$invoice->deposit_amount =
+    round($depositAmount, 2);
+
+$invoice->remaining_balance =
+    round(
+        $quote->total - $depositAmount,
+        2
+    );
+
+// ✅ PAYMENT STATUS
+
+$invoice->status =
+    $depositAmount > 0
+        ? 'partial'
+        : 'unpaid';
+
+// ✅ SAVE INVOICE
+
+$invoice->save();
+
+// ✅ LINK INVOICE TO QUOTE
+
+$quote->invoice_id = $invoice->id;
+
+$quote->save();
+
+}
+
+return redirect()
+    ->route(
+        'quotes.public_view',
+        $token
+    )
+    ->with(
+        'success',
+        'Contract Signed Successfully!'
+    );
+}
+
+public function downloadPdf($id)
+{
+    $quote = Quote::findOrFail($id);
+
+    $items = $this->normalizeItems($quote);
+
+    $isPdf = true;
+
+    $pdf = Pdf::loadView(
+        'quotes.pro_preview',
+        compact(
+            'quote',
+            'isPdf',
+            'items'
+        )
+    );
+
+    return $pdf->download(
+        'Quote-' .
+        $quote->quote_number .
+        '.pdf'
+    );
+}
+
+public function send(Request $request, $id)
+{
+    $quote = Quote::findOrFail($id);
+
+    $customer = Customer::find(
+        $quote->customer_id
+    );
+
+    $recipient =
+        $request->test_email
+        ?? ($customer->email ?? null);
+
+    if (!$recipient) {
+
+        return back()->with(
+            'error',
+            'No email found.'
+        );
     }
 
-    public function downloadPdf($id) { $quote = Quote::findOrFail($id); $items = $this->normalizeItems($quote); $isPdf = true; $pdf = Pdf::loadView('quotes.pro_preview', compact('quote', 'isPdf', 'items')); return $pdf->download('Quote-'.$quote->quote_number.'.pdf'); }
-    public function send(Request $request, $id) { $quote = Quote::findOrFail($id); $customer = Customer::find($quote->customer_id); $recipient = $request->test_email ?? ($customer->email ?? null); if (!$recipient) { return back()->with('error', 'No email found.'); } Mail::send('emails.quote_sent', ['quote' => $quote, 'link' => url('/q/' . $quote->public_token), 'customer' => $customer], function ($m) use ($recipient, $quote) { $m->to($recipient)->subject('Your Quote #' . $quote->quote_number . ' is Ready'); }); $quote->status = 'sent'; $quote->sent_at = now(); $quote->save(); return back()->with('success', 'Quote sent!'); }
-    public function markPaid($id) { $quote = Quote::findOrFail($id); $quote->status = 'paid'; $quote->save(); return back()->with('success', 'Paid.'); }
-    public function markDeposit($id) { $quote = Quote::findOrFail($id); $quote->status = 'partial'; $quote->save(); return back()->with('success', 'Deposit Paid.'); }
-    public function sendSms(Request $request, $id) { return back()->with('success', 'SMS Sent.'); }
+    Mail::send(
+        'emails.quote_sent',
+        [
+            'quote' => $quote,
+            'link' => url(
+                '/q/' .
+                $quote->public_token
+            ),
+            'customer' => $customer
+        ],
+        function ($m) use (
+            $recipient,
+            $quote
+        ) {
 
-    // ✅ DELETE QUOTE (APPEND-ONLY SAFE)
+            $m->to($recipient)
+              ->subject(
+                  'Your Quote #' .
+                  $quote->quote_number .
+                  ' is Ready'
+              );
+        }
+    );
+
+    $quote->status = 'sent';
+
+    $quote->sent_at = now();
+
+    $quote->save();
+
+    return back()->with(
+        'success',
+        'Quote sent!'
+    );
+}
+
+public function markPaid($id)
+{
+    $quote = Quote::findOrFail($id);
+
+    $quote->status = 'paid';
+
+    $quote->save();
+
+    return back()->with(
+        'success',
+        'Paid.'
+    );
+}
+
+public function markDeposit($id)
+{
+    $quote = Quote::findOrFail($id);
+
+    $quote->status = 'partial';
+
+    $quote->save();
+
+    return back()->with(
+        'success',
+        'Deposit Paid.'
+    );
+}
+
+public function sendSms(
+    Request $request,
+    $id
+) {
+
+    return back()->with(
+        'success',
+        'SMS Sent.'
+    );
+}
+
+// ✅ DELETE QUOTE (APPEND-ONLY SAFE)
     public function destroy($id)
     {
         $quote = \App\Models\Quote::where('company_id', auth()->user()->company_id)
