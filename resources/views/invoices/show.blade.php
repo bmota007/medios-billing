@@ -14,10 +14,6 @@ $total = $invoice->total ?? 0;
 
 $deposit = $invoice->deposit_amount;
 
-if(!$deposit || $deposit <= 0){
-    $deposit = $total * 0.35;
-}
-
 $remaining = $invoice->remaining_balance;
 
 if(!$remaining || $remaining <= 0){
@@ -26,6 +22,11 @@ if(!$remaining || $remaining <= 0){
 @endphp
 
 <div class="invoice-shell">
+@if(session('success'))
+<div class="success-banner">
+    {{ session('success') }}
+</div>
+@endif
 
     <div class="topbar">
 @if(!$isPublicView)
@@ -38,10 +39,25 @@ if(!$remaining || $remaining <= 0){
 
 <div class="right-actions">
 
-    <a href="{{ route('invoice.edit',$invoice->id) }}"
-       class="action-btn dark">
-        ✏ Edit Invoice
-    </a>
+<a href="{{ route('invoice.edit',$invoice->id) }}"
+   class="action-btn dark">
+    ✏ Edit Invoice
+</a>
+
+<form method="POST"
+      action="{{ route('invoice.send.existing') }}"
+      style="display:inline;">
+    @csrf
+
+    <input type="hidden"
+           name="invoice_id"
+           value="{{ $invoice->id }}">
+
+    <button type="submit"
+            class="action-btn send-btn">
+        ✉️ Send
+    </button>
+</form>
 
 @if($invoice->status === 'sent')
 
@@ -103,7 +119,27 @@ if(!$remaining || $remaining <= 0){
 
                 <div class="mini-title">
                     PROFESSIONAL INVOICE
-                </div>
+@if($invoice->status === 'paid')
+
+<div style="margin-top:15px;margin-bottom:20px;">
+
+    <span style="
+        background:#16a34a;
+        color:white;
+        padding:12px 22px;
+        border-radius:10px;
+        font-size:18px;
+        font-weight:800;
+        display:inline-block;
+    ">
+        ✅ PAID IN FULL
+    </span>
+
+</div>
+
+@endif
+
+  </div>
 
                 <h1>
                     Invoice #{{ $invoice->invoice_no }}
@@ -290,13 +326,25 @@ if(!$remaining || $remaining <= 0){
 
     <h2>Send Test Email</h2>
 
-    <input type="email"
-           class="test-email-input"
-           placeholder="you@example.com">
+    <form method="POST"
+          action="{{ route('invoice.test.email',$invoice->id) }}">
 
-    <button class="test-email-btn">
-        Send Test
-    </button>
+        @csrf
+
+        <input type="email"
+               name="test_email"
+               class="test-email-input"
+               placeholder="you@example.com"
+               required>
+
+        <button type="submit"
+                class="test-email-btn">
+
+            Send Test
+
+        </button>
+
+    </form>
 
 </div>
 
@@ -337,62 +385,123 @@ if(!$remaining || $remaining <= 0){
 
                         <div class="pay-box">
 
-                            <small>DEPOSIT REQUIRED</small>
+  <small>DEPOSIT REQUIRED</small>
 
-                            <h3>
-                                ${{ number_format($deposit,2) }}
-                            </h3>
+        <h3>
 
-                        </div>
+            ${{ number_format($deposit,2) }}
 
-                        <div class="pay-box">
+        </h3>
 
-                            <small>REMAINING BALANCE</small>
+    </div>
 
-                            <h3>
-                                ${{ number_format($remaining,2) }}
-                            </h3>
+@if($invoice->remaining_balance > 0)
 
-                        </div>
+    <div class="pay-box">
 
-                    </div>
+        <small>REMAINING BALANCE</small>
+
+        <h3>
+
+            ${{ number_format($remaining,2) }}
+
+        </h3>
+
+    </div>
+
+@endif
+
+</div>
+
 @if(!$isPublicView)
-                    <div class="payment-options">
 
-                        <label class="radio-option">
-                            <input type="radio" checked>
-                            <span>Customer will pay themselves</span>
-                        </label>
+    <div class="payment-options">
 
-                        <label class="radio-option">
-                            <input type="radio">
-                            <span>I am charging customer manually</span>
-                        </label>
+        <label class="radio-option">
 
-                    </div>
+            <input type="radio" checked>
 
-                    <div class="manual-text">
+            <span>Customer will pay themselves</span>
 
-                        <strong>Manual Charge Mode</strong>
+        </label>
 
-                        <p>
-                            Use these buttons if you are collecting payment
-                            directly by phone, in person, or assisting the customer.
-                        </p>
+        <label class="radio-option">
 
-                    </div>
+            <input type="radio">
 
-                    <div class="manual-buttons">
+            <span>I am charging customer manually</span>
 
-                        <button class="manual-btn blue-btn">
-                            💳 Pay Now
-                        </button>
+        </label>
 
-                        <button class="manual-btn gold-btn">
-                            💳 Pay Deposit
-                        </button>
+    </div>
 
-                    </div>
+    <div class="manual-text">
+
+        <strong>Manual Charge Mode</strong>
+
+        <p>
+
+            Use these buttons if you are collecting payment
+
+            directly by phone, in person, or assisting the customer.
+
+        </p>
+
+    </div>
+
+@endif
+
+@if(
+
+    $invoice->remaining_balance > 0 &&
+
+    $invoice->status !== 'paid'
+
+)
+
+<div class="manual-buttons">
+
+    <button class="manual-btn blue-btn">
+        💳 Pay Now
+    </button>
+
+    <button class="manual-btn gold-btn">
+        💳 Pay Deposit
+    </button>
+
+</div>
+@endif
+
+@if(
+    $invoice->status === 'partial' &&
+    $invoice->remaining_balance > 0 &&
+    $invoice->stripe_customer_id &&
+    $invoice->stripe_payment_method_id
+)
+
+<form method="POST"
+      action="{{ route('invoice.charge.remaining', $invoice->id) }}"
+      style="margin-top:18px;">
+
+    @csrf
+
+    <button type="submit"
+            class="manual-btn"
+            style="
+                width:100%;
+                background:linear-gradient(
+                    135deg,
+                    #16a34a,
+                    #22c55e
+                );
+            ">
+
+        ⚡ Charge Remaining Balance Now
+
+    </button>
+
+</form>
+
 @endif
                 </div>
 
@@ -404,7 +513,70 @@ if(!$remaining || $remaining <= 0){
 
 </div>
 
+@if($invoice->snapshots->count())
+
+<div style="margin-top:25px;">
+
+    <h3 style="margin-bottom:15px;">
+
+        Invoice Archive
+
+    </h3>
+
+    @foreach($invoice->snapshots as $snapshot)
+
+        <a
+
+            href="{{ route('invoice.snapshot.show', $snapshot->id) }}"
+
+
+            style="
+
+                display:inline-block;
+
+                margin-right:10px;
+
+                margin-bottom:10px;
+
+                background:#1d4ed8;
+
+                color:white;
+
+                padding:10px 16px;
+
+                border-radius:8px;
+
+                text-decoration:none;
+
+                font-weight:bold;
+
+            "
+
+        >
+
+            {{ strtoupper($snapshot->snapshot_type) }}
+
+        </a>
+
+    @endforeach
+
+</div>
+
+@endif
+
 <style>
+
+.success-banner{
+background:rgba(16,185,129,.15);
+border:1px solid #10b981;
+color:#10b981;
+padding:18px;
+border-radius:16px;
+margin-bottom:25px;
+text-align:center;
+font-weight:800;
+font-size:16px;
+}
 
 .invoice-shell{
 padding:30px;
@@ -817,6 +989,122 @@ background:linear-gradient(135deg,#0f766e,#14b8a6);
 }
 
 @media(max-width:1100px){
+
+@media(max-width:768px){
+
+.invoice-shell{
+padding:12px;
+overflow-x:hidden;
+}
+
+.invoice-card{
+padding:18px;
+border-radius:20px;
+overflow:hidden;
+}
+
+.invoice-header{
+flex-direction:column;
+align-items:flex-start;
+gap:20px;
+}
+
+.invoice-header h1{
+font-size:clamp(28px,8vw,42px);
+line-height:1.1;
+word-break:break-word;
+}
+
+.company-info{
+text-align:left;
+width:100%;
+}
+
+.company-info h2{
+font-size:clamp(26px,7vw,38px);
+line-height:1.1;
+word-break:break-word;
+}
+
+.topbar{
+flex-direction:column;
+align-items:stretch;
+}
+
+.right-actions{
+width:100%;
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+}
+
+.action-btn,
+.top-btn{
+width:100%;
+text-align:center;
+justify-content:center;
+display:flex;
+align-items:center;
+}
+
+.grid-top,
+.grid-dates,
+.payment-boxes,
+.manual-buttons{
+grid-template-columns:1fr;
+}
+
+.content-grid{
+grid-template-columns:1fr;
+}
+
+.card-block,
+.date-card,
+.panel{
+padding:18px;
+}
+
+.amount-due .amount{
+font-size:42px;
+word-break:break-word;
+}
+
+.summary-total{
+font-size:30px;
+flex-direction:column;
+align-items:flex-start;
+gap:10px;
+}
+
+.pay-box h3{
+font-size:28px;
+word-break:break-word;
+}
+
+.invoice-table{
+display:block;
+overflow-x:auto;
+white-space:nowrap;
+}
+
+.invoice-table th,
+.invoice-table td{
+font-size:14px;
+padding:12px 8px;
+}
+
+.sms-input,
+.sms-preview,
+.test-email-input{
+font-size:16px;
+}
+
+.pay-btn{
+font-size:16px;
+padding:18px;
+}
+
+}
 
 .content-grid{
 grid-template-columns:1fr;

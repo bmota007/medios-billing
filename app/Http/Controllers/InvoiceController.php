@@ -4,10 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use App\Models\Quote;
+use App\Models\InvoiceSnapshot;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Stripe\Stripe;
 use Stripe\Charge;
+use Stripe\Customer;
+use Stripe\PaymentIntent;
+use Stripe\PaymentMethod;
+use App\Models\InvoiceEvent;
 
 class InvoiceController extends Controller
 {
@@ -64,7 +69,73 @@ class InvoiceController extends Controller
             $request->payment_method ?? 'card';
 
         $invoice->save();
+// ✅ CUSTOMER EMAIL FALLBACK
 
+$customerEmail =
+    $invoice->customer_email
+    ?? optional($invoice->customer)->email;
+
+// ✅ BACKUP CUSTOMER LOOKUP
+
+if (
+    !$customerEmail &&
+    $invoice->customer_id
+) {
+
+    $customer =
+        \App\Models\Customer::find(
+            $invoice->customer_id
+        );
+
+    $customerEmail =
+        $customer?->email;
+}
+
+// ✅ SEND PAID IN FULL RECEIPT
+
+if ($customerEmail) {
+
+    Mail::send(
+        'emails.invoice_paid',
+        ['invoice' => $invoice],
+        function ($message) use (
+            $invoice,
+            $customerEmail
+        ) {
+
+            $message->to(
+                $customerEmail
+            )->subject(
+                'Paid In Full Receipt - Invoice #' .
+                $invoice->invoice_no
+            );
+
+        }
+    );
+}
+
+// ✅ SEND COMPANY NOTIFICATION
+
+if (
+    $invoice->company &&
+    $invoice->company->email
+) {
+
+    Mail::send(
+        'emails.invoice_paid_admin',
+        ['invoice' => $invoice],
+        function ($message) use ($invoice) {
+
+            $message->to(
+                $invoice->company->email
+            )->subject(
+                'Invoice Paid In Full - #' .
+                $invoice->invoice_no
+            );
+
+        }
+    );
+}
         $company = $invoice->company;
 
         $isTest = (
@@ -134,93 +205,392 @@ return back()->with(
         return view('invoices.show', compact('invoice'));
     }
 
-    // 🔥 STRIPE CHECKOUT SESSION
-    public function stripeCheckout($invoice_no)
-    {
-        $invoice = Invoice::where('invoice_no', $invoice_no)
-            ->with('company')
-            ->firstOrFail();
+// 🔥 STRIPE CHECKOUT SESSION
+public function stripeCheckout($invoice_no)
+{
+    $invoice = Invoice::where('invoice_no', $invoice_no)
+        ->with('company')
+        ->firstOrFail();
 
-        $company = $invoice->company;
+    $company = $invoice->company;
 
-        $isTest = ($company->stripe_mode ?? 'test') === 'test';
+    $isTest = (
+        $company->stripe_mode ?? 'test'
+    ) === 'test';
 
-        \Stripe\Stripe::setApiKey(
-            $isTest
-                ? $company->stripe_test_secret_key
-                : $company->stripe_secret_key
+    \Stripe\Stripe::setApiKey(
+        $isTest
+            ? $company->stripe_test_secret_key
+            : $company->stripe_secret_key
+    );
+
+    // ✅ BLOCK DUPLICATE PAYMENTS
+
+    if ($invoice->status === 'paid') {
+
+        return redirect()
+            ->back()
+            ->with(
+                'error',
+                'This invoice has already been paid.'
+            );
+    }
+
+    // ✅ BLOCK REPEATED DEPOSIT PAYMENTS
+
+    if (
+        $invoice->status === 'partial' &&
+        $invoice->remaining_balance > 0
+    ) {
+
+        return redirect()
+            ->back()
+            ->with(
+                'error',
+                'Deposit already paid. Remaining balance still due.'
+            );
+    }
+
+    try {
+
+        $session = \Stripe\Checkout\Session::create([
+
+'payment_method_types' => ['card'],
+
+'mode' => 'payment',
+
+'customer_creation' => 'always',
+
+'payment_intent_data' => [
+
+    'setup_future_usage' => 'off_session',
+
+],
+
+'line_items' => [[
+
+    'price_data' => [
+
+        'currency' => 'usd',
+
+        'product_data' => [
+
+            'name' =>
+                'Invoice #' .
+                $invoice->invoice_no,
+
+        ],
+
+'unit_amount' => (int) round(
+
+    (
+        $invoice->deposit_amount > 0
+            ? $invoice->deposit_amount
+            : $invoice->total
+
+    ) * 100
+
+),
+
+    ],
+
+    'quantity' => 1,
+
+
+            ]],
+'customer_email' =>
+    $invoice->customer_email,
+'metadata' => [
+
+    'invoice_no' =>
+        $invoice->invoice_no,
+
+],
+            'success_url' => url(
+                '/invoice/success/' .
+                $invoice->invoice_no
+            ),
+
+            'cancel_url' => url(
+                '/invoice/pay/' .
+                $invoice->invoice_no
+            ),
+
+        ]);
+
+        return redirect($session->url);
+
+    } catch (\Exception $e) {
+
+        return back()->with(
+            'error',
+            $e->getMessage()
+        );
+    }
+}
+
+// 🔥 STRIPE SUCCESS HANDLER
+public function stripeSuccess($invoice_no)
+{
+    $invoice = Invoice::where('invoice_no', $invoice_no)
+        ->orWhere('invoice_number', $invoice_no)
+        ->with('company', 'customer')
+        ->first();
+
+    if (!$invoice) {
+
+        return redirect('/')
+            ->with(
+                'error',
+                'Invoice not found.'
+            );
+    }
+
+    // ✅ ONLY PROCESS ONCE
+
+    if (
+        $invoice->status !== 'paid' &&
+        $invoice->status !== 'partial'
+    ) {
+
+// ✅ DETERMINE AMOUNT PAID
+
+if (
+    $invoice->deposit_amount > 0 &&
+    $invoice->remaining_balance > 0
+) {
+
+    // ✅ DEPOSIT PAYMENT ONLY
+
+    $invoice->amount_paid =
+        round($invoice->deposit_amount, 2);
+
+    $invoice->remaining_balance =
+        round(
+            $invoice->total -
+            $invoice->deposit_amount,
+            2
         );
 
-        try {
+    $invoice->status = 'partial';
 
-            $session = \Stripe\Checkout\Session::create([
+} else {
 
-                'payment_method_types' => ['card'],
+    // ✅ FULL PAYMENT
 
-                'mode' => 'payment',
+    $invoice->amount_paid =
+        round($invoice->total, 2);
 
-                'line_items' => [[
+    $invoice->remaining_balance = 0;
 
-                    'price_data' => [
+    $invoice->status = 'paid';
+}
 
-                        'currency' => 'usd',
+$invoice->paid_at = now();
 
-                        'product_data' => [
-                            'name' => 'Invoice #' . $invoice->invoice_no,
-                        ],
+$invoice->payment_method = 'stripe';
+// ✅ STORE STRIPE CUSTOMER + PAYMENT METHOD
+try {
 
-                        'unit_amount' => intval(
-                            $invoice->total * 100
-                        ),
+    $company = $invoice->company;
 
-                    ],
+    $isTest = (
+        $company->stripe_mode ?? 'test'
+    ) === 'test';
 
-                    'quantity' => 1,
+    \Stripe\Stripe::setApiKey(
+        $isTest
+            ? $company->stripe_test_secret_key
+            : $company->stripe_secret_key
+    );
 
-                ]],
+    // Get latest checkout session
+    $sessions = \Stripe\Checkout\Session::all([
+        'limit' => 1,
+    ]);
 
-                'success_url' => url(
-                    '/invoice/success/' . $invoice->invoice_no
-                ),
+    if (
+        isset($sessions->data[0])
+    ) {
 
-                'cancel_url' => url(
-                    '/invoice/pay/' . $invoice->invoice_no
-                ),
+        $session = $sessions->data[0];
 
-            ]);
+        $invoice->stripe_customer_id =
+            $session->customer ?? null;
 
-            return redirect($session->url);
+        // Pull payment intent
+        if ($session->payment_intent) {
 
-        } catch (\Exception $e) {
+            $intent =
+                \Stripe\PaymentIntent::retrieve(
+                    $session->payment_intent
+                );
 
-            dd($e->getMessage());
+            $invoice->stripe_payment_method_id =
+                $intent->payment_method ?? null;
+        }
 
+        $invoice->save();
+    }
+
+} catch (\Exception $e) {
+
+    \Log::error(
+        'Stripe save error: ' .
+        $e->getMessage()
+    );
+}
+
+$invoice->save();
+if ($invoice->status === 'partial') {
+
+    InvoiceEvent::create([
+
+        'invoice_id' => $invoice->id,
+
+        'company_id' => $invoice->company_id,
+
+        'user_id' => auth()->id(),
+
+        'event_type' => 'deposit_paid',
+
+        'title' => 'Deposit Payment Received',
+
+        'description' => 'Customer paid invoice deposit.',
+
+        'event_data' => [
+
+            'amount_paid' => $invoice->amount_paid,
+
+        ],
+
+        'ip_address' => request()->ip(),
+
+    ]);
+
+}
+
+// ✅ CREATE DEPOSIT RECEIPT SNAPSHOT
+
+if ($invoice->status === 'partial') {
+
+    InvoiceSnapshot::create([
+
+        'invoice_id' =>
+            $invoice->id,
+
+        'invoice_no' =>
+            $invoice->invoice_no,
+
+        'snapshot_type' =>
+            'deposit_receipt',
+
+        'snapshot_data' => [
+
+            'invoice' => $invoice
+                ->load('company', 'customer')
+                ->toArray(),
+
+        ],
+
+        'amount' =>
+            $invoice->amount_paid,
+
+        'payment_reference' =>
+            $invoice->payment_reference,
+
+        'snapshot_created_at' =>
+            now(),
+
+    ]);
+}
+
+// ✅ MARK RELATED QUOTE STATUS
+
+if ($invoice->quote_id) {
+
+    Quote::where(
+        'id',
+        $invoice->quote_id
+    )->update([
+        'status' => $invoice->status
+    ]);
+}
+
+// ✅ CUSTOMER EMAIL FALLBACK
+
+$customerEmail =
+    $invoice->customer_email
+    ?? optional($invoice->customer)->email;
+
+// ✅ DEBUG FALLBACK SAFETY
+
+if (
+    !$customerEmail &&
+    $invoice->customer_id
+) {
+
+    $customer =
+        \App\Models\Customer::find(
+            $invoice->customer_id
+        );
+
+    $customerEmail =
+        $customer?->email;
+}
+
+// ✅ EMAIL CUSTOMER RECEIPT
+
+if ($customerEmail) {
+
+    Mail::send(
+        'emails.invoice_paid',
+        ['invoice' => $invoice],
+        function ($message) use (
+            $invoice,
+            $customerEmail
+        ) {
+
+            $message->to(
+                $customerEmail
+            )->subject(
+                'Payment Receipt - Invoice #' .
+                $invoice->invoice_no
+            );
+
+        }
+    );
+}
+
+// ✅ EMAIL TENANT / COMPANY
+
+        if (
+            $invoice->company &&
+            $invoice->company->email
+        ) {
+
+            Mail::send(
+                'emails.invoice_paid_admin',
+                ['invoice' => $invoice],
+                function ($message) use ($invoice) {
+
+                    $message->to(
+                        $invoice->company->email
+                    )->subject(
+                        'Invoice Paid - #' .
+                        $invoice->invoice_no
+                    );
+
+                }
+            );
         }
     }
 
-    // 🔥 STRIPE SUCCESS HANDLER
-    public function stripeSuccess($invoice_no)
-    {
-        $invoice = Invoice::where('invoice_no', $invoice_no)
-            ->orWhere('invoice_number', $invoice_no)
-            ->first();
-
-        if (!$invoice) {
-            return redirect('/')
-                ->with('error', 'Invoice not found.');
-        }
-
-        if ($invoice->status !== 'paid') {
-
-            $invoice->status = 'paid';
-            $invoice->paid_at = now();
-            $invoice->payment_method = 'stripe';
-
-            $invoice->save();
-        }
-
-        return view('invoices.success', compact('invoice'));
-    }
+    return view(
+        'invoices.success',
+        compact('invoice')
+    );
+}
 
     // ✅ INTERNAL INVOICE VIEW
     public function view($id)
@@ -370,7 +740,62 @@ $invoice->auto_charge_enabled =
         $invoice->status = 'unpaid';
 
         $invoice->save();
+InvoiceEvent::create([
 
+    'invoice_id' => $invoice->id,
+
+    'company_id' => auth()->user()->company_id ?? null,
+
+    'user_id' => auth()->id(),
+
+    'event_type' => 'invoice_created',
+
+    'title' => 'Invoice Created',
+
+    'description' => 'Invoice was successfully created.',
+
+    'event_data' => [
+
+        'invoice_no' => $invoice->invoice_no,
+
+        'total' => $invoice->total,
+
+    ],
+
+    'ip_address' => request()->ip(),
+
+]);
+
+// ✅ CREATE ORIGINAL SNAPSHOT
+
+InvoiceSnapshot::create([
+
+    'invoice_id' =>
+        $invoice->id,
+
+    'invoice_no' =>
+        $invoice->invoice_no,
+
+    'snapshot_type' =>
+        'original',
+
+    'snapshot_data' => [
+
+        'invoice' => $invoice->toArray(),
+
+        'items' => $items,
+
+    ],
+
+    'amount' =>
+        $invoice->total,
+
+    'snapshot_created_at' =>
+        now(),
+
+]);
+
+/*
 // ✅ SEND EMAIL TO CUSTOMER
 Mail::send(
     'emails.invoice_created',
@@ -387,6 +812,7 @@ Mail::send(
         );
     }
 );
+*/
 
 // ✅ MARK AS SENT
 $invoice->status = 'sent';
@@ -483,5 +909,322 @@ public function resend($invoice)
         return $pdf->download(
             'Invoice-' . $invoice->invoice_no . '.pdf'
         );
+
     }
+// ✅ DELETE INVOICE
+public function destroy($invoice)
+{
+    $invoice = Invoice::where(
+        'company_id',
+        auth()->user()->company_id
+    )->findOrFail($invoice);
+
+    // ✅ OPTIONAL SAFETY:
+    // Prevent deleting paid invoices
+
+// ✅ OPTIONAL PROTECTION
+// Allow deleting paid invoices for admins/testing
+
+if (
+    $invoice->status === 'paid' &&
+    auth()->user()->role !== 'admin'
+) {
+
+    return redirect()
+        ->back()
+        ->with(
+            'error',
+            'Paid invoices cannot be deleted.'
+        );
+}
+
+// ✅ DELETE INVOICE
+
+$invoice->delete();
+
+return redirect('/invoices')
+    ->with(
+        'success',
+        'Invoice deleted successfully.'
+    );
+}
+
+public function testEmail(Request $request, $invoice)
+{
+    $invoice = Invoice::where(
+        'company_id',
+        auth()->user()->company_id
+    )->findOrFail($invoice);
+
+    Mail::send(
+        'emails.invoice_created',
+        ['invoice' => $invoice],
+        function ($m) use ($invoice, $request) {
+
+            $m->to($request->test_email);
+
+            $m->subject(
+                'TEST Invoice #' . $invoice->invoice_no
+            );
+        }
+    );
+
+    return redirect()->back()
+        ->with(
+            'success',
+            'Test email sent successfully!'
+        );
+}
+public function chargeRemainingBalance($invoice)
+{
+    $invoice = Invoice::where(
+        'company_id',
+        auth()->user()->company_id
+    )->findOrFail($invoice);
+
+    // ✅ MUST HAVE STRIPE CUSTOMER
+
+    if (
+        !$invoice->stripe_customer_id ||
+        !$invoice->stripe_payment_method_id
+    ) {
+
+        return redirect()
+            ->back()
+            ->with(
+                'error',
+                'Missing Stripe customer or payment method.'
+            );
+    }
+
+    // ✅ MUST HAVE BALANCE
+
+    if ($invoice->remaining_balance <= 0) {
+
+        return redirect()
+            ->back()
+            ->with(
+                'error',
+                'No remaining balance due.'
+            );
+    }
+
+    try {
+
+        $company = $invoice->company;
+
+        $isTest = (
+            $company->stripe_mode ?? 'test'
+        ) === 'test';
+
+        \Stripe\Stripe::setApiKey(
+
+            $isTest
+                ? $company->stripe_test_secret_key
+                : $company->stripe_secret_key
+
+        );
+
+        $intent = \Stripe\PaymentIntent::create([
+
+            'amount' => intval(
+                $invoice->remaining_balance * 100
+            ),
+
+            'currency' => 'usd',
+
+            'customer' =>
+                $invoice->stripe_customer_id,
+
+            'payment_method' =>
+                $invoice->stripe_payment_method_id,
+
+            'off_session' => true,
+
+            'confirm' => true,
+
+            'description' =>
+                'Remaining balance charge for invoice #' .
+                $invoice->invoice_no,
+
+        ]);
+
+        // ✅ MARK FULLY PAID
+
+        $invoice->amount_paid =
+            $invoice->total;
+
+        $invoice->remaining_balance = 0;
+
+        $invoice->status = 'paid';
+
+        $invoice->remaining_charged_at =
+            now();
+
+        $invoice->payment_reference =
+            $intent->id;
+
+        $invoice->paid_at = now();
+
+        $invoice->save();
+InvoiceEvent::create([
+
+    'invoice_id' => $invoice->id,
+
+    'company_id' => $invoice->company_id,
+
+    'user_id' => auth()->id(),
+
+    'event_type' => 'invoice_paid',
+
+    'title' => 'Invoice Paid In Full',
+
+    'description' => 'Invoice balance fully paid.',
+
+    'event_data' => [
+
+        'payment_reference' => $invoice->payment_reference,
+
+        'amount_paid' => $invoice->amount_paid,
+
+    ],
+
+    'ip_address' => request()->ip(),
+
+]);
+
+// ✅ CREATE FINAL RECEIPT SNAPSHOT
+
+InvoiceSnapshot::create([
+
+    'invoice_id' =>
+        $invoice->id,
+
+    'invoice_no' =>
+        $invoice->invoice_no,
+
+    'snapshot_type' =>
+        'final_receipt',
+
+    'snapshot_data' => [
+
+        'invoice' =>
+            $invoice->toArray(),
+
+    ],
+
+    'amount' =>
+        $invoice->total,
+
+    'payment_reference' =>
+        $intent->id ?? null,
+
+    'snapshot_created_at' =>
+        now(),
+
+]);
+
+// ✅ CUSTOMER EMAIL FALLBACK
+
+$customerEmail =
+    $invoice->customer_email
+    ?? optional($invoice->customer)->email;
+
+// ✅ BACKUP CUSTOMER LOOKUP
+
+if (
+    !$customerEmail &&
+    $invoice->customer_id
+) {
+
+    $customer =
+        \App\Models\Customer::find(
+            $invoice->customer_id
+        );
+
+    $customerEmail =
+        $customer?->email;
+}
+
+// ✅ SEND PAID IN FULL RECEIPT
+
+if ($customerEmail) {
+
+    Mail::send(
+        'emails.invoice_paid',
+        ['invoice' => $invoice],
+        function ($message) use (
+            $invoice,
+            $customerEmail
+        ) {
+
+            $message->to(
+                $customerEmail
+            )->subject(
+                'Paid In Full Receipt - Invoice #' .
+                $invoice->invoice_no
+            );
+
+        }
+    );
+}
+
+// ✅ SEND COMPANY NOTIFICATION
+
+if (
+    $invoice->company &&
+    $invoice->company->email
+) {
+
+    Mail::send(
+        'emails.invoice_paid_admin',
+        ['invoice' => $invoice],
+        function ($message) use ($invoice) {
+
+            $message->to(
+                $invoice->company->email
+            )->subject(
+                'Invoice Paid In Full - #' .
+                $invoice->invoice_no
+            );
+
+        }
+    );
+}
+
+        // ✅ UPDATE RELATED QUOTE
+
+        if ($invoice->quote_id) {
+
+            Quote::where(
+                'id',
+                $invoice->quote_id
+            )->update([
+                'status' => 'paid'
+            ]);
+        }
+
+        return redirect()
+            ->back()
+            ->with(
+                'success',
+                'Remaining balance charged successfully.'
+            );
+
+    } catch (\Exception $e) {
+
+        \Log::error(
+            'Remaining balance charge failed: ' .
+            $e->getMessage()
+        );
+
+        return redirect()
+            ->back()
+            ->with(
+                'error',
+                'Stripe charge failed: ' .
+                $e->getMessage()
+            );
+    }
+}
 }
