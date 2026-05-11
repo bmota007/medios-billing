@@ -12,9 +12,18 @@
         <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <p><strong>Receipt #:</strong> {{ $invoice->invoice_no }}</p>
 
-            <p><strong>Amount Paid:</strong> 
-                ${{ number_format($invoice->amount_paid ?? 0, 2) }}
-            </p>
+<p><strong>Amount Paid:</strong>
+${{ number_format(
+    ($invoice->deposit_amount > 0
+        && $invoice->status !== 'paid')
+        ? $invoice->deposit_amount
+        : (
+            $invoice->deposit_amount > 0
+                ? $invoice->deposit_amount
+                : $invoice->total
+        ),
+    2
+) }}</p>
 
             <p><strong>Status:</strong> 
                 @if($invoice->status === 'paid')

@@ -12,7 +12,18 @@
             <p><strong>Invoice:</strong> #{{ $invoice->invoice_no }}</p>
 
             {{-- ✅ CORRECT PAYMENT LOGIC --}}
-            <p><strong>Amount Paid:</strong> ${{ number_format($invoice->amount_paid ?? 0, 2) }}</p>
+<p><strong>Amount Paid:</strong>
+${{ number_format(
+    ($invoice->deposit_amount > 0
+        && $invoice->status !== 'paid')
+        ? $invoice->deposit_amount
+        : (
+            $invoice->deposit_amount > 0
+                ? $invoice->deposit_amount
+                : $invoice->total
+        ),
+    2
+) }}</p>
 
             @if($invoice->status === 'partial')
                 <p><strong>Status:</strong> PARTIAL PAYMENT RECEIVED</p>

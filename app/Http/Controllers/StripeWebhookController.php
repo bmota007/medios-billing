@@ -38,7 +38,44 @@ class StripeWebhookController extends Controller
         if ($type === 'checkout.session.completed') {
 
             $session = $event->data->object ?? null;
+/*
+|--------------------------------------------------------------------------
+| INVOICE PAYMENT WEBHOOK
+|--------------------------------------------------------------------------
+*/
 
+if (
+    isset($session->metadata->invoice_no)
+) {
+
+    $invoiceNo =
+        $session->metadata->invoice_no;
+
+    $invoice =
+        \App\Models\Invoice::where(
+            'invoice_no',
+            $invoiceNo
+        )->first();
+
+    if ($invoice) {
+
+        $invoice->status = 'paid';
+
+        $invoice->paid_at = now();
+
+        $invoice->payment_reference =
+            $session->payment_intent ?? null;
+
+        $invoice->stripe_customer_id =
+            $session->customer ?? null;
+
+        $invoice->save();
+
+        Log::info(
+            "✅ Invoice payment webhook updated: {$invoiceNo}"
+        );
+    }
+}
             $companyId = $session->client_reference_id ?? null;
 
             if ($companyId) {

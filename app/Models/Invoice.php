@@ -45,6 +45,18 @@ class Invoice extends Model
         return $this->belongsTo(\App\Models\Company::class);
     }
 
+public function snapshots()
+{
+    return $this->hasMany(
+        \App\Models\InvoiceSnapshot::class
+    );
+}
+public function events()
+{
+    return $this->hasMany(
+        \App\Models\InvoiceEvent::class
+    )->latest();
+}
     public function items_relation()
     {
         return $this->hasMany(\App\Models\InvoiceItem::class, 'invoice_id', 'id');

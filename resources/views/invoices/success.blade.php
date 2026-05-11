@@ -96,7 +96,7 @@ h1 {
         </div>
 
         <div class="amount">
-            ${{ number_format($invoice->total, 2) }}
+${{ number_format($invoice->amount_paid, 2) }}
         </div>
 
         <div class="details">

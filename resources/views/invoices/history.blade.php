@@ -177,6 +177,21 @@ display:inline-block;
 
 <a href="{{ route('invoice.view',$invoice->id) }}" class="btnx view">View</a>
 
+@if($invoice->snapshots->count())
+
+<a href="{{ route('invoice.view',$invoice->id) }}"
+   class="btnx"
+   style="
+        background:#7c3aed;
+        color:white;
+   ">
+
+    Archive
+
+</a>
+
+@endif
+
 @if(Route::has('invoice.download'))
 <a href="{{ route('invoice.download',$invoice->id) }}" class="btnx pdf">PDF</a>
 @endif
