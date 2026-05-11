@@ -37,11 +37,28 @@ Homestead.yaml
 Thumbs.db
 # Backup / temp files
 *.bak
+*.BAK
+*.BAK.*
 *.BROKEN
 *.backup
+*.BACKUP
+*.BACKUP-*
+*.before-*
+*.save
+*.save.*
 *.old
 *.tmp
 *.sed
+*.LIVE-original-*
+
+# Env backup variants
+.env.LIVE*
+.env.save*
+.env.*-original-*
+
+# Accidental root-level key/secret files
+/tripe_*
+/stripe_*
 
 # Local backup folders
 backups/
