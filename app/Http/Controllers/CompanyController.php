@@ -109,28 +109,33 @@ public function updateBranding(Request $request)
         $company->stripe_mode = $request->stripe_mode;
     }
 
-    // ✅ LIVE KEYS
-    if ($request->has('stripe_publishable_key')) {
-        $company->stripe_publishable_key = $request->stripe_publishable_key;
-    }
+// ✅ LIVE KEYS
+if (!empty($request->stripe_publishable_key)) {
+    $company->stripe_publishable_key =
+        $request->stripe_publishable_key;
+}
 
-    if ($request->has('stripe_secret_key')) {
-        $company->stripe_secret_key = $request->stripe_secret_key;
-    }
+if (!empty($request->stripe_secret_key)) {
+    $company->stripe_secret_key =
+        $request->stripe_secret_key;
+}
 
-    // ✅ TEST KEYS
-    if ($request->has('stripe_test_publishable_key')) {
-        $company->stripe_test_publishable_key = $request->stripe_test_publishable_key;
-    }
+// ✅ TEST KEYS
+if (!empty($request->stripe_test_publishable_key)) {
+    $company->stripe_test_publishable_key =
+        $request->stripe_test_publishable_key;
+}
 
-    if ($request->has('stripe_test_secret_key')) {
-        $company->stripe_test_secret_key = $request->stripe_test_secret_key;
-    }
+if (!empty($request->stripe_test_secret_key)) {
+    $company->stripe_test_secret_key =
+        $request->stripe_test_secret_key;
+}
 
-    // ✅ WEBHOOK
-    if ($request->has('stripe_webhook_secret')) {
-        $company->stripe_webhook_secret = $request->stripe_webhook_secret;
-    }
+// ✅ WEBHOOK
+if (!empty($request->stripe_webhook_secret)) {
+    $company->stripe_webhook_secret =
+        $request->stripe_webhook_secret;
+}
 
     $company->save();
 

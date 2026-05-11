@@ -57,6 +57,16 @@ Route::match(['get', 'post'], '/logout', function () {
     return redirect()->route('login');
 })->name('logout');
 
+Route::get(
+    '/r/{token}',
+    [App\Http\Controllers\InvoiceSnapshotController::class, 'publicReceipt']
+)->name('receipt.public');
+
+Route::get(
+    '/r/{token}/download',
+    [App\Http\Controllers\InvoiceSnapshotController::class, 'publicDownload']
+)->name('receipt.public.download');
+
 /* BILLING */
 Route::middleware('auth')->group(function () {
     Route::get('/subscribe', function () { return view('billing.subscribe'); })->name('subscribe');
@@ -79,7 +89,20 @@ Route::middleware(['auth', 'check.subscription'])->group(function () {
     Route::post('/quotes/{quote}/mark-paid', [QuoteController::class, 'markPaid'])->name('quotes.markPaid');
     Route::post('/quotes/{quote}/mark-deposit', [QuoteController::class, 'markDeposit'])->name('quotes.markDeposit');
     Route::post('/quotes/{quote}/convert', [QuoteController::class, 'convertToInvoice'])->name('quotes.convert');
-    
+Route::get(
+    '/invoice/snapshot/{snapshot}',
+    [\App\Http\Controllers\InvoiceSnapshotController::class, 'show']
+)->name('invoice.snapshot.show');
+Route::get(
+    '/invoice/snapshot/{snapshot}/download',
+    [App\Http\Controllers\InvoiceSnapshotController::class, 'download']
+)->name('invoice.snapshot.download');
+
+Route::get(
+    '/invoice/snapshot/{snapshot}/email',
+    [App\Http\Controllers\InvoiceSnapshotController::class, 'email']
+)->name('invoice.snapshot.email');
+
     Route::get('/invoices', [InvoiceController::class, 'history'])->name('invoice.history');
     Route::get('/invoice/create', [InvoiceController::class, 'showForm'])->name('invoice.create');
     Route::post('/invoice/send', [InvoiceController::class, 'send'])->name('invoice.send');
@@ -89,6 +112,11 @@ Route::post('/invoice/send-existing', [InvoiceController::class, 'sendExisting']
     Route::get('/invoice/internal/{invoice}', [InvoiceController::class, 'view'])->name('invoice.view');
 Route::get('/invoice/pdf/{invoice}', [InvoiceController::class, 'pdf'])->name('invoice.pdf');   
  Route::post('/invoice/{invoice}/resend', [InvoiceController::class, 'resend'])->name('invoice.resend');
+Route::post('/invoice/test-email/{invoice}', [InvoiceController::class, 'testEmail'])->name('invoice.test.email');
+Route::post(
+    '/invoice/{invoice}/charge-remaining',
+    [InvoiceController::class, 'chargeRemainingBalance']
+)->name('invoice.charge.remaining');
 
     Route::get('/company/settings', [CompanyController::class, 'settings'])->name('company.settings');
     Route::post('/company/settings', [CompanyController::class, 'update'])->name('company.update');

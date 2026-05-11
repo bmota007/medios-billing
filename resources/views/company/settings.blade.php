@@ -44,15 +44,27 @@
 
 <div class="two-col">
 <input type="text" name="stripe_publishable_key" value="{{ $company->stripe_publishable_key }}" placeholder="Live Publishable Key">
-<input type="password" name="stripe_secret_key" placeholder="Live Secret Key">
-</div>
+
+<input
+type="password"
+name="stripe_secret_key"
+value="{{ $company->stripe_secret_key }}"
+placeholder="Live Secret Key"></div>
 
 <div class="two-col">
 <input type="text" name="stripe_test_publishable_key" value="{{ $company->stripe_test_publishable_key }}" placeholder="Test Publishable Key">
-<input type="password" name="stripe_test_secret_key" placeholder="Test Secret Key">
+<input
+type="password"
+name="stripe_test_secret_key"
+value="{{ $company->stripe_test_secret_key }}"
+placeholder="Test Secret Key">
 </div>
 
-<input type="password" name="stripe_webhook_secret" placeholder="Stripe Webhook Secret (WHSEC)">
+<input
+type="password"
+name="stripe_webhook_secret"
+value="{{ $company->stripe_webhook_secret }}"
+placeholder="Stripe Webhook Secret (WHSEC)">
 </div>
 
 {{-- CONTRACTS --}}
